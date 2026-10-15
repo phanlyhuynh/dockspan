@@ -3,6 +3,7 @@ mod containers;
 mod ctx;
 mod events;
 mod images;
+mod k8s;
 mod netvol;
 mod projects;
 mod rawapi;
@@ -20,6 +21,9 @@ use std::sync::Mutex as StdMutex;
 use tauri::Manager;
 
 pub fn run() {
+    // GUI apps do not inherit the shell PATH; kubeconfig exec plugins (gke-gcloud-auth-plugin, aws, kubelogin…)
+    // are started by kube-rs with the process PATH, so extend it before any thread is spawned.
+    std::env::set_var("PATH", util::cli_path());
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -35,6 +39,7 @@ pub fn run() {
                 execs: tokio::sync::Mutex::new(HashMap::new()),
                 store: StdMutex::new(store),
             });
+            app.manage(k8s::K8sState::default());
             events::start_monitor(app.handle());
             prune::start_scheduler(app.handle());
             Ok(())
@@ -58,6 +63,11 @@ pub fn run() {
             projects::project_remove, projects::project_rename, projects::project_refresh, projects::compose_run, projects::project_files,
             projects::project_read_file, projects::project_write_file, projects::open_in_editor,
             projects::open_terminal, projects::open_folder, projects::open_url, projects::save_text, projects::settings_get, projects::settings_set,
+            k8s::k8s_clusters, k8s::k8s_kubeconfig_contexts, k8s::k8s_add, k8s::k8s_remove, k8s::k8s_select, k8s::k8s_test, k8s::k8s_probe,
+            k8s::k8s_namespaces, k8s::k8s_list, k8s::k8s_scale, k8s::k8s_restart, k8s::k8s_delete_pod,
+            k8s::k8s_watch, k8s::k8s_unwatch, k8s::k8s_logs, k8s::k8s_logs_stop,
+            k8s::k8s_exec, k8s::k8s_exec_write, k8s::k8s_exec_resize, k8s::k8s_exec_close,
+            k8s::k8s_pf_start, k8s::k8s_pf_stop, k8s::k8s_pf_list,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Dockspan");

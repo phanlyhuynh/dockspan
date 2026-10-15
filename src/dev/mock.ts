@@ -126,6 +126,76 @@ const handlers: Record<string, (a: Any) => Any> = {
   home_dir: () => '/Users/dev',
 };
 
+// ---------- Kubernetes (fake clusters) ----------
+const kClusters: Any[] = [
+  { id: 'kind-dev', name: 'kind-dev', kubeconfigPath: '~/.kube/config', kubeContext: 'kind-dev', server: 'https://127.0.0.1:6443', namespace: null, user: 'kind-dev', source: 'default' },
+  { id: 'gke-prod', name: 'gke-prod', kubeconfigPath: '~/.kube/config', kubeContext: 'gke-prod', server: 'https://34.120.10.8', namespace: 'default', user: 'gke', source: 'default' },
+];
+const kLabels = (app: string) => ({ app, 'pod-template-hash': '7f9c6b5d4' });
+const kDeps: Any[] = [['shop', 'api', 2, 'myshop-api:1.4.2'], ['shop', 'web', 2, 'myshop-web:1.4.2'], ['shop', 'worker', 1, 'myshop-api:1.4.2'], ['monitoring', 'grafana', 1, 'grafana/grafana:11.2.0']]
+  .map(([namespace, name, replicas, image]) => ({ namespace, name, replicas, ready: replicas, updated: replicas, available: replicas, image, selector: { app: name }, created: now - 9 * 86400 }));
+const kPod = (namespace: string, app: string, status = 'Running', restarts = 0, extra: Any = {}) => ({
+  namespace, name: `${app}-7f9c6b5d4-${hex(5)}`, status, phase: status === 'Running' ? 'Running' : 'Pending', ready: status === 'Running' ? '1/1' : '0/1', restarts,
+  created: now - 2 * 86400, node: 'kind-dev-worker', containers: [app], labels: kLabels(app), owner: { kind: 'ReplicaSet', name: `${app}-7f9c6b5d4` },
+  waitingReason: status === 'Running' ? null : status, waitingMessage: null, lastTerminatedReason: restarts ? 'Error' : null, lastExitCode: restarts ? 1 : null, deleting: false, ...extra,
+});
+const kPods: Any[] = [kPod('shop', 'api'), kPod('shop', 'api'), kPod('shop', 'web'), kPod('shop', 'web'), kPod('shop', 'worker', 'CrashLoopBackOff', 7), kPod('monitoring', 'grafana')];
+kDeps.find((d) => d.name === 'worker').ready = 0;
+const kSvcs: Any[] = [
+  { namespace: 'shop', name: 'api', type: 'ClusterIP', clusterIp: '10.96.12.40', ports: [{ name: 'http', port: 3000, targetPort: 'http', nodePort: null, protocol: 'TCP' }], selector: { app: 'api' }, created: now - 9 * 86400 },
+  { namespace: 'shop', name: 'web', type: 'NodePort', clusterIp: '10.96.80.11', ports: [{ name: null, port: 80, targetPort: '8080', nodePort: 30080, protocol: 'TCP' }], selector: { app: 'web' }, created: now - 9 * 86400 },
+  { namespace: 'monitoring', name: 'grafana', type: 'LoadBalancer', clusterIp: '10.96.33.2', ports: [{ name: null, port: 3000, targetPort: '3000', nodePort: 31300, protocol: 'TCP' }], selector: { app: 'grafana' }, created: now - 20 * 86400 },
+];
+const kPfs: Any[] = [];
+const kWatch = (kind: string) => emit('k8s://watch', { cluster: 'kind-dev', kind });
+const kOnly = (rows: Any[], ns: string | null) => rows.filter((r) => !ns || r.namespace === ns).map((r) => ({ ...r }));
+const kSync = (d: Any) => {
+  const mine = kPods.filter((p) => p.labels.app === d.name && !p.deleting);
+  while (mine.length < d.replicas) { const p = kPod(d.namespace, d.name, 'ContainerCreating'); kPods.push(p); mine.push(p); setTimeout(() => { Object.assign(p, { status: 'Running', phase: 'Running', ready: '1/1', waitingReason: null }); d.ready = Math.min(d.replicas, d.ready + 1); kWatch('pods'); kWatch('deployments'); }, 1400); }
+  while (mine.length > d.replicas) { const p = mine.pop(); p.status = 'Terminating'; p.deleting = true; setTimeout(() => { kPods.splice(kPods.indexOf(p), 1); kWatch('pods'); }, 1200); }
+  d.ready = Math.min(d.ready, d.replicas);
+  kWatch('pods'); kWatch('deployments');
+};
+Object.assign(handlers, {
+  k8s_clusters: () => ({ clusters: kClusters.map((c) => ({ ...c })), activeId: 'kind-dev' }),
+  k8s_kubeconfig_contexts: () => [...kClusters.map((c) => ({ name: c.kubeContext, server: c.server, namespace: c.namespace, added: true })), { name: 'minikube', server: 'https://192.168.49.2:8443', namespace: null, added: false }],
+  k8s_add: (a: Any) => { const c = { id: a.context, name: a.context, kubeconfigPath: a.path || '~/.kube/config', kubeContext: a.context, server: 'https://192.168.49.2:8443', namespace: null, user: a.context, source: 'default' }; if (!kClusters.some((x) => x.id === c.id)) kClusters.push(c); return c; },
+  k8s_remove: (a: Any) => { const i = kClusters.findIndex((c) => c.id === a.id); if (i >= 0) kClusters.splice(i, 1); },
+  k8s_select: () => undefined,
+  k8s_test: async (a: Any) => {
+    await sleep(500);
+    if (a.id === 'gke-prod') throw 'Unauthorized: the token was rejected (401)';
+    if (a.id === 'minikube') throw 'Could not connect to https://192.168.49.2:8443: i/o timeout';
+    return { version: 'v1.31.0', nodes: 3, latencyMs: 23, server: 'https://127.0.0.1:6443', namespace: 'default' };
+  },
+  k8s_probe: async () => { await sleep(500); return { version: 'v1.31.0', nodes: 1, latencyMs: 31, server: 'https://192.168.49.2:8443', namespace: 'default' }; },
+  k8s_namespaces: () => ['default', 'kube-system', 'monitoring', 'shop'],
+  k8s_list: (a: Any) => kOnly(a.kind === 'pods' ? kPods : a.kind === 'deployments' ? kDeps : kSvcs, a.ns),
+  k8s_scale: (a: Any) => { const d = kDeps.find((x) => x.name === a.name && x.namespace === a.ns); if (d) { d.replicas = a.replicas; kSync(d); } },
+  k8s_restart: (a: Any) => { const d = kDeps.find((x) => x.name === a.name && x.namespace === a.ns); if (!d) return; for (const p of kPods.filter((p) => p.labels.app === d.name)) { p.status = 'Terminating'; p.deleting = true; setTimeout(() => { kPods.splice(kPods.indexOf(p), 1); kWatch('pods'); }, 1200); } d.ready = 0; kSync(d); },
+  k8s_delete_pod: (a: Any) => { const p = kPods.find((x) => x.name === a.name); if (!p) return; p.status = 'Terminating'; p.deleting = true; setTimeout(() => { kPods.splice(kPods.indexOf(p), 1); const d = kDeps.find((x) => x.name === p.labels.app); if (d) kSync(d); }, 1200); kWatch('pods'); },
+  k8s_watch: () => undefined, k8s_unwatch: () => undefined,
+  k8s_logs: (a: Any) => {
+    const crash = /worker/.test(a.pod);
+    const lines = crash
+      ? ['Starting worker v1.4.2', 'Connecting to amqp://rabbitmq:5672', 'Error: getaddrinfo ENOTFOUND rabbitmq', '    at GetAddrInfoReqWrap.onlookup (node:dns:107:26)', 'ERROR worker exited with code 1']
+      : ['Server listening on :3000', 'GET /health 200 1ms', 'GET /api/products 200 14ms', 'WARN slow request /api/search 640ms'];
+    setTimeout(() => emit(`k8s://logs/${a.key}`, lines.map((text, i) => ({ ts: new Date(Date.now() - (lines.length - i) * 1000).toISOString(), stream: 'stdout', text }))), 60);
+    if (!a.follow) setTimeout(() => emit(`k8s://logs/${a.key}`, { end: true }), 120);
+  },
+  k8s_logs_stop: () => undefined,
+  k8s_exec: (a: Any) => { setTimeout(() => emit(`exec://${a.sid}`, { t: 'data', d: btoa(`${a.pod}:/app$ `) }), 80); return { sid: a.sid, shell: '' }; },
+  k8s_exec_write: () => undefined, k8s_exec_resize: () => undefined, k8s_exec_close: () => undefined,
+  k8s_pf_start: (a: Any) => {
+    let local = a.port < 1024 ? a.port + 8000 : a.port;
+    while (kPfs.some((p) => p.localPort === local)) local++;
+    const pf = { id: `${a.id}|${a.ns}|${a.service}|${a.port}`, clusterId: a.id, clusterName: a.id, namespace: a.ns, service: a.service, remotePort: a.port, localPort: local };
+    kPfs.push(pf); return pf;
+  },
+  k8s_pf_stop: (a: Any) => { const i = kPfs.findIndex((p) => p.id === a.pfId); if (i >= 0) kPfs.splice(i, 1); },
+  k8s_pf_list: () => kPfs.map((p) => ({ ...p })),
+});
+
 w.__TAURI_INTERNALS__ = {
   metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main', windowLabel: 'main' }, windows: [], webviews: [] },
   transformCallback: (fn: (e: Any) => void) => { const id = cbSeq++; cbs.set(id, fn); return id; },

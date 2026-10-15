@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   api, on, type Container, type CtxInfo, type DfInfo, type DockerEvent, type EngineInfo, type EngineStatus, type ImageRow,
-  type NetworkRow, type Project, type Schedule, type VolumeRow,
+  type K8sPod, type NetworkRow, type Project, type Schedule, type VolumeRow,
 } from './api';
 import { hhmm, fmtBytes } from './lib/format';
 import { DEFAULT_PRUNE_SEL, computePruneDefs, selectedTotal, type PruneId } from './lib/prune';
@@ -30,7 +30,10 @@ export type ModalState =
   | { kind: 'volCreate' }
   | { kind: 'vol'; name: string }
   | { kind: 'pruneConfirm' }
-  | { kind: 'schedule' };
+  | { kind: 'schedule' }
+  | { kind: 'k8sAdd' }
+  | { kind: 'podLogs'; clusterId: string; pod: K8sPod }
+  | { kind: 'podExec'; clusterId: string; pod: K8sPod };
 
 export type EngineState = 'on' | 'off' | 'starting' | 'stopping' | 'connecting';
 

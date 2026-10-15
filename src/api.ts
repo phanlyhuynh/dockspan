@@ -61,6 +61,28 @@ export interface VolFile { name: string; isDir: boolean; size: number; mtime: nu
 export interface NetDetail { id: string; name: string; driver: string; scope: string; subnet: string; gateway: string; containers: { id: string; name: string; ip: string }[] }
 export interface ImageDetail { layers: { cmd: string; size: number }[]; os: string; architecture: string }
 
+// ---------- Kubernetes ----------
+
+export interface Cluster {
+  id: string; name: string; kubeconfigPath: string; kubeContext: string; server: string;
+  namespace: string | null; user: string | null; source: 'default' | 'file';
+}
+export interface ClusterCheck { version: string; nodes: number | null; latencyMs: number; server: string; namespace: string }
+export interface KubeCtxOption { name: string; server: string; namespace: string | null; added: boolean }
+export interface K8sDeployment {
+  namespace: string; name: string; replicas: number; ready: number; updated: number; available: number;
+  image: string; selector: Record<string, string>; created: number;
+}
+export interface K8sPod {
+  namespace: string; name: string; status: string; phase: string; ready: string; restarts: number; created: number; node: string;
+  containers: string[]; labels: Record<string, string>; owner: { kind: string; name: string } | null;
+  waitingReason: string | null; waitingMessage: string | null; lastTerminatedReason: string | null; lastExitCode: number | null; deleting: boolean;
+}
+export interface K8sSvcPort { name: string | null; port: number; targetPort: string | null; nodePort: number | null; protocol: string }
+export interface K8sService { namespace: string; name: string; type: string; clusterIp: string; ports: K8sSvcPort[]; selector: Record<string, string>; created: number }
+export interface PortFwd { id: string; clusterId: string; clusterName: string; namespace: string; service: string; remotePort: number; localPort: number }
+export type K8sKind = 'deployments' | 'pods' | 'services';
+
 // ---------- backend calls ----------
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -145,6 +167,32 @@ export const api = {
   saveText: (path: string, content: string) => call<void>('save_text', { path, content }),
   settingsGet: () => call<{ editorCommand: string }>('settings_get'),
   settingsSet: (editorCommand: string) => call<void>('settings_set', { editorCommand }),
+
+  k8sClusters: () => call<{ clusters: Cluster[]; activeId: string | null }>('k8s_clusters'),
+  k8sKubeconfigContexts: (path: string) => call<KubeCtxOption[]>('k8s_kubeconfig_contexts', { path }),
+  k8sAdd: (path: string, context: string) => call<Cluster>('k8s_add', { path, context }),
+  k8sRemove: (id: string) => call<void>('k8s_remove', { id }),
+  k8sSelect: (id: string) => call<void>('k8s_select', { id }),
+  k8sTest: (id: string, relogin = false) => call<ClusterCheck>('k8s_test', { id, relogin }),
+  k8sProbe: (path: string, context: string) => call<ClusterCheck>('k8s_probe', { path, context }),
+  k8sNamespaces: (id: string) => call<string[]>('k8s_namespaces', { id }),
+  k8sList: <T,>(id: string, kind: K8sKind, ns: string | null) => call<T[]>('k8s_list', { id, kind, ns }),
+  k8sScale: (id: string, ns: string, name: string, replicas: number) => call<void>('k8s_scale', { id, ns, name, replicas }),
+  k8sRestart: (id: string, ns: string, name: string) => call<void>('k8s_restart', { id, ns, name }),
+  k8sDeletePod: (id: string, ns: string, name: string) => call<void>('k8s_delete_pod', { id, ns, name }),
+  k8sWatch: (id: string, ns: string | null) => call<void>('k8s_watch', { id, ns }),
+  k8sUnwatch: () => call<void>('k8s_unwatch'),
+  k8sLogs: (key: string, id: string, ns: string, pod: string, container: string | null, previous: boolean, follow: boolean, tail = 500) =>
+    call<void>('k8s_logs', { key, id, ns, pod, container, previous, follow, tail }),
+  k8sLogsStop: (key: string) => call<void>('k8s_logs_stop', { key }),
+  k8sExec: (sid: string, id: string, ns: string, pod: string, container: string | null, shell: string, cols: number, rows: number) =>
+    call<{ sid: string; shell: string }>('k8s_exec', { sid, id, ns, pod, container, shell, cols, rows }),
+  k8sExecWrite: (sid: string, data: string) => call<void>('k8s_exec_write', { sid, data }),
+  k8sExecResize: (sid: string, cols: number, rows: number) => call<void>('k8s_exec_resize', { sid, cols, rows }),
+  k8sExecClose: (sid: string) => call<void>('k8s_exec_close', { sid }),
+  k8sPfStart: (id: string, ns: string, service: string, port: number, localPort?: number) => call<PortFwd>('k8s_pf_start', { id, ns, service, port, localPort }),
+  k8sPfStop: (pfId: string) => call<void>('k8s_pf_stop', { pfId }),
+  k8sPfList: () => call<PortFwd[]>('k8s_pf_list'),
 };
 
 export function on<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
