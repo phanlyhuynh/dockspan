@@ -39,14 +39,7 @@ pub fn start_monitor<R: Runtime>(app: &AppHandle<R>) {
         let mut attempt = 0usize;
         loop {
             let st = app2.state::<AppState>();
-            let endpoint = st.active().endpoint;
-            let conn = match ctx::connect_negotiated(&endpoint).await {
-                Ok(d) => match tokio::time::timeout(Duration::from_secs(5), d.ping()).await {
-                    Ok(Ok(_)) => Some(d),
-                    _ => None,
-                },
-                Err(_) => None,
-            };
+            let conn = ctx::connect_active(&st).await.ok();
             if let Some(d) = conn {
                 attempt = 0;
                 *st.docker.lock().unwrap() = Some(d.clone());
@@ -96,11 +89,9 @@ pub async fn engine_status(state: State<'_, AppState>) -> CmdResult<Value> {
     let mut d = state.docker.lock().unwrap().clone();
     if d.is_none() {
         // Right after the app opens, the monitor may not have connected yet: connect now so we do not wrongly report "stopped".
-        if let Ok(c) = ctx::connect_negotiated(&active.endpoint).await {
-            if matches!(tokio::time::timeout(Duration::from_secs(2), c.ping()).await, Ok(Ok(_))) {
-                *state.docker.lock().unwrap() = Some(c.clone());
-                d = Some(c);
-            }
+        if let Ok(c) = ctx::connect_active(&state).await {
+            *state.docker.lock().unwrap() = Some(c.clone());
+            d = Some(c);
         }
     }
     let Some(d) = d else {
@@ -152,8 +143,16 @@ async fn run_quiet(prog: &str, args: &[&str]) -> Result<(), String> {
 }
 
 /// Start/stop the engine depending on the operating system and the runtime in use.
-async fn control(start: bool, endpoint: &str) -> Result<(), String> {
+async fn control(start: bool, c: &ctx::CtxInfo) -> Result<(), String> {
     let verb = if start { "start" } else { "stop" };
+    let endpoint = c.endpoint.as_str();
+    if c.kind == "wsl" {
+        // dockerd inside the distro: systemd when the distro has it, otherwise the SysV service.
+        let prog = crate::wsl::program().ok_or("WSL is not available on this machine")?;
+        let distro = c.wsl_distro.clone().unwrap_or_default();
+        let script = format!("systemctl {v} docker docker.socket 2>/dev/null || service docker {v}", v = verb);
+        return run_quiet(prog, &["-d", &distro, "-u", "root", "--", "sh", "-c", &script]).await;
+    }
     if cfg!(target_os = "macos") {
         if endpoint.contains(".colima") {
             return run_quiet("colima", &[verb]).await;
@@ -191,7 +190,7 @@ async fn control(start: bool, endpoint: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn engine_stop<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> CmdResult<()> {
     let active = state.active();
-    if active.kind != "local" {
+    if active.kind != "local" && active.kind != "wsl" {
         return Err("The engine can only be stopped on this machine. For remote machines use SSH.".into());
     }
     // Record the running containers so they can be started again when the engine starts.
@@ -206,7 +205,7 @@ pub async fn engine_stop<R: Runtime>(app: AppHandle<R>, state: State<'_, AppStat
             s.was_running.insert(id, list);
         });
     }
-    control(false, &active.endpoint).await?;
+    control(false, &active.spec).await?;
     // A failed ping does not mean it has fully stopped: Docker Desktop needs ~30 s to exit. Starting again too early makes it hang,
     // so wait until nothing accepts connections on the socket any more (a stale socket file may remain), at most 90 s.
     for _ in 0..90 {
@@ -215,7 +214,7 @@ pub async fn engine_stop<R: Runtime>(app: AppHandle<R>, state: State<'_, AppStat
             Some(d) => matches!(tokio::time::timeout(Duration::from_secs(2), d.ping()).await, Ok(Ok(_))),
             None => false,
         };
-        if !alive && !endpoint_listening(&active.endpoint).await {
+        if !alive && (active.kind == "wsl" || !endpoint_listening(&active.endpoint).await) {
             break;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -227,18 +226,16 @@ pub async fn engine_stop<R: Runtime>(app: AppHandle<R>, state: State<'_, AppStat
 #[tauri::command]
 pub async fn engine_start(state: State<'_, AppState>) -> CmdResult<()> {
     let active = state.active();
-    if active.kind != "local" {
+    if active.kind != "local" && active.kind != "wsl" {
         return Err("The engine can only be started on this machine.".into());
     }
-    control(true, &active.endpoint).await?;
+    control(true, &active.spec).await?;
     // Wait for the engine to be ready (at most 120 s).
     let mut ready: Option<bollard::Docker> = None;
     for _ in 0..120 {
-        if let Ok(d) = ctx::connect_negotiated(&active.endpoint).await {
-            if matches!(tokio::time::timeout(Duration::from_secs(2), d.ping()).await, Ok(Ok(_))) {
-                ready = Some(d);
-                break;
-            }
+        if let Ok(d) = ctx::connect_active(&state).await {
+            ready = Some(d);
+            break;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

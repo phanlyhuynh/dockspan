@@ -71,6 +71,14 @@ impl Default for Settings {
     }
 }
 
+/// A WSL2 distro used as a Docker engine (kept in the app: the docker CLI cannot use such an endpoint).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WslCtx {
+    pub name: String,
+    pub distro: String,
+}
+
 /// A kubeconfig context added from a file other than the default kubeconfig.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -106,6 +114,11 @@ pub struct Store {
     pub was_running: HashMap<String, Vec<String>>,
     #[serde(default)]
     pub kube: KubeCfg,
+    #[serde(default)]
+    pub wsl_contexts: Vec<WslCtx>,
+    /// SSH private key per Docker context name (docker contexts have no place for it).
+    #[serde(default)]
+    pub ssh_keys: HashMap<String, String>,
     #[serde(skip)]
     pub path: PathBuf,
 }

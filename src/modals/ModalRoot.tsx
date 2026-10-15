@@ -1,6 +1,7 @@
 import { useApp } from '../store';
 import { ConfirmModal, InfoModal, PaletteModal, PruneConfirmModal, ScheduleModal } from './Basic';
 import { AddModal, BuildModal, FilesModal, RenameModal } from './Project';
+import { CtxAddModal } from './Connection';
 import { K8sAddModal, PodExecDrawer, PodLogsDrawer } from './Kube';
 import { ImageDrawer, NetCreateModal, NetDrawer, PullModal, RunModal, VolCreateModal, VolDrawer } from './Docker';
 
@@ -25,6 +26,7 @@ export function ModalRoot() {
     case 'pruneConfirm': return <PruneConfirmModal />;
     case 'schedule': return <ScheduleModal />;
     case 'k8sAdd': return <K8sAddModal />;
+    case 'ctxAdd': return <CtxAddModal type={m.type} distro={m.distro} />;
     case 'podLogs': return <PodLogsDrawer clusterId={m.clusterId} pod={m.pod} />;
     case 'podExec': return <PodExecDrawer clusterId={m.clusterId} pod={m.pod} />;
   }

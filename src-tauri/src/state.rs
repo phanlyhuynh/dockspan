@@ -14,6 +14,15 @@ pub struct ActiveCtx {
     pub name: String,
     pub endpoint: String,
     pub kind: String,
+    /// Full connection details (TLS files, SSH key, WSL distro).
+    #[serde(skip)]
+    pub spec: crate::ctx::CtxInfo,
+}
+
+impl ActiveCtx {
+    pub fn from_spec(c: crate::ctx::CtxInfo) -> Self {
+        ActiveCtx { id: c.id.clone(), name: c.name.clone(), endpoint: c.endpoint.clone(), kind: c.kind.clone(), spec: c }
+    }
 }
 
 pub struct ExecSession {
@@ -30,6 +39,8 @@ pub struct AppState {
     pub tasks: StdMutex<HashMap<String, JoinHandle<()>>>,
     pub execs: Mutex<HashMap<String, ExecSession>>,
     pub store: StdMutex<Store>,
+    /// Local TCP bridge of the active SSH/WSL2 context (kept while that context is in use).
+    pub bridge: StdMutex<Option<crate::bridge::Bridge>>,
 }
 
 impl AppState {

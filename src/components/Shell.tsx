@@ -3,6 +3,7 @@ import { useApp, usePruneDefs, type EngineState, type View } from '../store';
 import { useK8s } from '../k8sStore';
 import { fmtBytes } from '../lib/format';
 import { sumBytes } from '../lib/prune';
+import { ctxTypeLabel } from '../lib/connections';
 import { Icon, ICONS } from './ui';
 import { t } from '../i18n';
 
@@ -93,17 +94,17 @@ function ContextMenu() {
     <div className="menu" style={{ top: 'auto', bottom: 'calc(100% + 6px)', left: 0, right: 0, minWidth: 0 }}>
       <span className="muted" style={{ fontSize: 11, padding: '6px 10px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Docker context</span>
       {contexts.map((c) => (
-        <button key={c.id} className="mi" style={{ minHeight: 46, opacity: c.supported ? 1 : 0.55 }} onClick={() => (c.supported ? void switchCtx(c.id) : useApp.getState().toast(t("Connections of type {v0} are not supported at this stage", { v0: c.kind.toUpperCase() }), 'info'))}>
+        <button key={c.id} className="mi" style={{ minHeight: 46, opacity: c.supported ? 1 : 0.55 }} title={c.reason ?? undefined} onClick={() => (c.supported ? void switchCtx(c.id) : useApp.getState().toast(c.reason ?? '', 'info'))}>
           <span className={c.active ? 'dot run' : 'dot'} />
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="ell">{c.name}</span>
-            <span className="muted ell" style={{ fontSize: 11.5 }}>{TYPE_LABEL[c.kind] ?? c.kind} · {c.endpoint}</span>
+            <span className="muted ell" style={{ fontSize: 11.5 }}>{ctxTypeLabel(c)} · {c.endpoint}</span>
           </span>
           {c.active && <Icon d={ICONS.check} size={15} stroke="#7FB0FF" sw={2.4} />}
         </button>
       ))}
       <div style={{ height: 1, background: '#2F3644', margin: '4px 0' }} />
-      <button className="mi" onClick={() => openModal({ kind: 'info', title: t("Add connection"), body: t("Adding WSL2, SSH and TCP/TLS connections is planned for phase 4 of the roadmap.\\n\\nFor now the app uses the existing Docker contexts from `docker context ls` (local sockets). Kubernetes clusters are added with “Add cluster” on the Kubernetes page.") })}>{t("Add connection…")}</button>
+      <button className="mi" onClick={() => openModal({ kind: 'ctxAdd' })}>{t("Add connection…")}</button>
       <button className="mi" onClick={() => setView('settings')}>{t("Manage connections")}</button>
     </div>
   );
@@ -116,6 +117,8 @@ export function Header() {
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
   const busy = engine.state === 'starting' || engine.state === 'stopping' || engine.state === 'connecting';
+  // Only engines on this machine (a local socket or a WSL2 distro) can be started/stopped from the app.
+  const remote = engine.ctx?.kind === 'ssh' || engine.ctx?.kind === 'tcp';
   const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
   return (
     <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '14px 28px', borderBottom: '1px solid #242935', background: '#11141A' }}>
@@ -133,7 +136,7 @@ export function Header() {
         <button className="ib" aria-label={t("Settings")} title={t("Settings")} onClick={() => setView('preferences')} style={{ width: 40, height: 40, borderRadius: 9, color: view === 'preferences' ? '#CFE0FF' : undefined, background: view === 'preferences' ? '#1F2A3F' : undefined, borderColor: view === 'preferences' ? '#2F6FEB' : undefined }}>
           <Icon d={ICONS.cog} size={18} sw={1.8} />
         </button>
-        <button className={engine.state === 'on' || engine.state === 'stopping' ? 'btn red' : 'btn pri'} disabled={busy} onClick={() => void toggleEngine()}>
+        <button className={engine.state === 'on' || engine.state === 'stopping' ? 'btn red' : 'btn pri'} disabled={busy || remote} title={remote ? t("A remote engine is started and stopped on its own machine") : undefined} onClick={() => void toggleEngine()}>
           <Icon d={ICONS.power} />
           <span>{engine.state === 'on' || engine.state === 'stopping' ? t("Stop Docker") : t("Start")}</span>
         </button>
@@ -145,10 +148,13 @@ export function Header() {
 export function EngineBanner({ children }: { children?: ReactNode }) {
   const state = useApp((s) => s.engine.state);
   const lost = useApp((s) => s.engine.lost);
+  const ctx = useApp((s) => s.engine.ctx);
+  const remote = ctx?.kind === 'ssh' || ctx?.kind === 'tcp';
   if (state === 'on') return <>{children}</>;
   const text =
     state === 'connecting' ? t("Connecting to the new context…")
     : state === 'off' && lost ? t("Lost connection to Docker, retrying (1 s, 2 s, 5 s, 10 s)… The data below is from the last update.")
+    : state === 'off' && remote ? t("Cannot reach the engine at {endpoint}; retrying (1 s, 2 s, 5 s, 10 s)… Check the machine and the network, or switch context.", { endpoint: ctx?.endpoint ?? '' })
     : state === 'off' ? t("Docker Engine is stopped. Press “Start” to use it again; write actions are blocked.")
     : state === 'starting' ? t("Docker Engine is starting…")
     : t("Docker Engine is stopping…");

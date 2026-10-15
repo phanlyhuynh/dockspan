@@ -18,7 +18,7 @@ fn mk_app() -> App<MockRuntime> {
     let dir = std::env::temp_dir().join("dockspan-smoke-store");
     let _ = std::fs::remove_dir_all(&dir);
     let store = Store::load(dir.join("store.json"));
-    let active = ctx::initial_context(None);
+    let active = ctx::initial_context(&store);
     app.manage(AppState {
         docker: StdMutex::new(None),
         active: StdMutex::new(active),
@@ -26,6 +26,7 @@ fn mk_app() -> App<MockRuntime> {
         tasks: StdMutex::new(HashMap::new()),
         execs: tokio::sync::Mutex::new(HashMap::new()),
         store: StdMutex::new(store),
+        bridge: StdMutex::new(None),
     });
     app
 }
@@ -575,4 +576,127 @@ async fn k8s_write_flow() {
 
     Api::<Namespace>::all(client).delete(&ns, &DeleteParams::default()).await.expect("delete namespace");
     println!("k8s write flow OK");
+}
+
+// ---------------------------------------------------------------- SSH / TCP+TLS / WSL2
+
+/// Add, test, switch to, use and remove SSH / TCP+TLS / WSL2 connections. Each one runs only when its variables are set:
+/// `DOCKSPAN_SSH` (`user@host:port`) + optional `DOCKSPAN_SSH_KEY`; `DOCKSPAN_TLS` (`host:port`) + `DOCKSPAN_TLS_CERTS` (folder with
+/// ca.pem, cert.pem, key.pem); `DOCKSPAN_WSL` (distro). Uses a temporary DOCKER_CONFIG, so `~/.docker` is not touched.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn multi_engine_flow() {
+    use crate::ctx::{self, NewCtx};
+    let cfg = std::env::temp_dir().join("dockspan-smoke-docker-config");
+    let _ = std::fs::remove_dir_all(&cfg);
+    std::fs::create_dir_all(&cfg).unwrap();
+    std::env::set_var("DOCKER_CONFIG", &cfg);
+    let app = mk_app();
+    let h = app.handle().clone();
+    let mut forms: Vec<NewCtx> = Vec::new();
+    if let Ok(v) = std::env::var("DOCKSPAN_SSH") {
+        let (dest, port) = v.rsplit_once(':').map(|(a, b)| (a.to_string(), b.parse().ok())).unwrap_or((v.clone(), None));
+        let (user, host) = dest.split_once('@').map(|(u, h)| (Some(u.to_string()), h.to_string())).unwrap_or((None, dest.clone()));
+        forms.push(NewCtx { name: format!("{}-ssh", PREFIX), kind: "ssh".into(), host: Some(host), user, port, key: std::env::var("DOCKSPAN_SSH_KEY").ok(), ..Default::default() });
+    }
+    if let Ok(v) = std::env::var("DOCKSPAN_TLS") {
+        forms.push(NewCtx { name: format!("{}-tls", PREFIX), kind: "tcp".into(), host: Some(v), tls: Some(true), cert_dir: std::env::var("DOCKSPAN_TLS_CERTS").ok(), ..Default::default() });
+    }
+    if let Ok(v) = std::env::var("DOCKSPAN_WSL") {
+        forms.push(NewCtx { name: format!("{}-wsl", PREFIX), kind: "wsl".into(), distro: Some(v), ..Default::default() });
+    }
+    assert!(!forms.is_empty(), "set DOCKSPAN_SSH, DOCKSPAN_TLS and/or DOCKSPAN_WSL");
+
+    for f in forms {
+        let name = f.name.clone();
+        let kind = f.kind.clone();
+        println!("--- {} ({})", name, kind);
+        let probe = ctx::ctx_probe(NewCtx { ..clone_form(&f) }).await.unwrap_or_else(|e| panic!("{}: probe failed: {}", name, e));
+        println!("probe: Docker {} · {} · {} ms", probe["version"], probe["os"], probe["latencyMs"]);
+        let added = ctx::ctx_add(h.state(), f).expect("add");
+        assert!(added.supported, "{:?}", added.reason);
+        assert!(ctx::ctx_add(h.state(), NewCtx { name: name.clone(), kind: "wsl".into(), distro: Some("x".into()), ..Default::default() }).is_err(), "duplicate name accepted");
+        if kind != "wsl" {
+            // Written exactly like `docker context create`: the real CLI must list it with the same endpoint.
+            let out = std::process::Command::new("docker").env("DOCKER_CONFIG", &cfg).args(["context", "inspect", &name, "--format", "{{.Endpoints.docker.Host}}"]).output().unwrap();
+            assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), added.endpoint, "docker CLI sees: {}", String::from_utf8_lossy(&out.stderr));
+        }
+        let t = ctx::ctx_test(h.state(), added.id.clone()).await.expect("test");
+        println!("test: Docker {} · {} ms", t["version"], t["latencyMs"]);
+
+        let sw = ctx::ctx_switch(h.clone(), h.state(), added.id.clone()).await.expect("switch");
+        assert_eq!(sw.id, added.id);
+        let st = h.state::<AppState>();
+        let n = containers::containers_list(h.state()).await.expect("containers").len();
+        let df = prune::system_df(h.state()).await.expect("df");
+        let status = events::engine_status(h.state()).await.expect("status");
+        assert_eq!(status["state"], "on");
+        // The docker CLI (compose/build/volume helpers) reaches the same engine.
+        let out = crate::cli::run_output({
+            let mut c = crate::cli::docker_cmd(&st);
+            c.args(["version", "--format", "{{.Server.Version}}"]);
+            c
+        })
+        .await
+        .expect("docker CLI through the context");
+        assert_eq!(out.trim(), t["version"].as_str().unwrap());
+        // A terminal session works over the connection too (hijacked HTTP through the bridge / TLS).
+        let ex = collect(&app, "exec://mesid");
+        let cid = {
+            let d = st.docker().unwrap();
+            let _ = d.remove_container(&format!("{}-me", PREFIX), Some(bollard::query_parameters::RemoveContainerOptionsBuilder::new().force(true).build())).await;
+            let mut c = crate::cli::docker_cmd(&st);
+            c.args(["run", "-d", "--name", &format!("{}-me", PREFIX), IMG, "sleep", "300"]);
+            crate::cli::run_output(c).await.expect("docker run").trim().to_string()
+        };
+        containers::exec_open(h.clone(), h.state(), "mesid".into(), cid.clone(), "sh".into(), 80, 24).await.expect("exec");
+        containers::exec_write(h.state(), "mesid".into(), "echo multi-$((6*7))\n".into()).await.unwrap();
+        let mut ok = false;
+        for _ in 0..50 {
+            let b64 = base64::engine::general_purpose::STANDARD;
+            let txt: String = ex.lock().unwrap().iter().filter_map(|p| serde_json::from_str::<serde_json::Value>(p).ok()).filter_map(|v| v["d"].as_str().and_then(|d| b64.decode(d).ok())).map(|b| String::from_utf8_lossy(&b).to_string()).collect();
+            if txt.contains("multi-42") {
+                ok = true;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+        assert!(ok, "exec output missing");
+        containers::exec_close(h.state(), "mesid".into()).await.unwrap();
+        containers::container_remove(h.state(), cid, true).await.expect("rm");
+        println!("{}: {} containers, images {} B", name, n, df["imagesSize"]);
+
+        assert!(ctx::ctx_remove(h.state(), added.id.clone()).is_err(), "removing the active context must be refused");
+        ctx::ctx_switch(h.clone(), h.state(), "default".into()).await.expect("switch back");
+        assert!(st.bridge.lock().unwrap().is_none(), "bridge of the old context still running");
+        ctx::ctx_remove(h.state(), added.id.clone()).expect("remove");
+        assert!(!ctx::ctx_list(h.state()).iter().any(|c| c["id"] == added.id.as_str()));
+    }
+    let _ = std::fs::remove_dir_all(&cfg);
+}
+
+fn clone_form(f: &crate::ctx::NewCtx) -> crate::ctx::NewCtx {
+    crate::ctx::NewCtx {
+        name: f.name.clone(), kind: f.kind.clone(), socket: f.socket.clone(), host: f.host.clone(), user: f.user.clone(),
+        port: f.port, key: f.key.clone(), tls: f.tls, cert_dir: f.cert_dir.clone(), distro: f.distro.clone(),
+    }
+}
+
+/// READ-ONLY: list WSL2 distros and the Docker version inside the running ones (Windows, or WSL with interop).
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn wsl_list_probe() {
+    let app = mk_app();
+    let h = app.handle().clone();
+    let r = crate::wsl::wsl_list(h.state()).await.expect("wsl_list");
+    println!("{}", serde_json::to_string_pretty(&r).unwrap());
+}
+
+/// READ-ONLY: hosts of the real `~/.ssh/config` as the Add connection modal shows them.
+#[tokio::test]
+#[ignore]
+async fn ssh_hosts_probe() {
+    for h in crate::sshcfg::ssh_hosts().await {
+        println!("{} → user:{} port:{} key:{} jump:{}", h.alias, h.user.is_some(), h.port, h.identity_file.is_some(), h.proxy_jump.is_some());
+    }
 }

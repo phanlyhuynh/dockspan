@@ -12,7 +12,9 @@ pub fn docker_cmd(state: &AppState) -> Command {
     let mut c = Command::new("docker");
     c.env("PATH", cli_path())
         .env_remove("DOCKER_CONTEXT")
-        .env("DOCKER_HOST", state.active().endpoint)
+        .env_remove("DOCKER_TLS_VERIFY")
+        .env_remove("DOCKER_CERT_PATH")
+        .envs(crate::ctx::cli_env(state))
         .env("BUILDKIT_PROGRESS", "plain")
         .stdin(Stdio::null())
         .kill_on_drop(true);
