@@ -1,0 +1,57 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+Dockspan is a desktop Docker manager (Tauri 2 + Rust `bollard` + React/TS/Vite/Zustand). README and code comments are in English; the UI supports English (default) and Vietnamese, see the i18n section below. The original spec is `Dockyard – Đặc tả chức năng (từ prototype UI UX).md` (Vietnamese) and the UI prototype is `Docker Manager UI … App.html` (a bundle; its CSS was copied into `src/styles.css`). Implemented scope: phases 1–3 of the roadmap (spec section 11.5). Kubernetes, SSH/TCP-TLS/WSL2 contexts, tray and the light theme are **not built** (the Kubernetes page is only a placeholder).
+
+## Commands
+
+Run `source ~/.cargo/env` first if your shell does not have cargo.
+
+```bash
+pnpm install
+pnpm tauri dev                 # run the real app (Rust + real Docker); Vite on port 1420 (strictPort)
+pnpm tauri build --bundles app # package the .app
+pnpm build                     # tsc --noEmit + vite build (frontend)
+npx tsc --noEmit               # typecheck only
+pnpm test                      # vitest, everything
+npx vitest run src/lib/prune.test.ts          # one file
+npx vitest run -t "test name"                 # one test
+cd src-tauri && cargo check
+cd src-tauri && cargo test schedule_next_due  # pure test, no Docker needed
+cd src-tauri && cargo test <name> -- --ignored --nocapture --test-threads=1   # integration tests against real Docker
+```
+
+The integration tests (`src-tauri/src/smoke.rs`: `engine_and_docker_flow`, `compose_project_flow`, `exec_resize_probe`, `stop_probe`) are all `#[ignore]`, use Tauri's mock app, only touch resources prefixed `dockspan-smoke`, pull `alpine:3.20`, **never run prune**, and call `engine_start` themselves if the engine is stopped (which opens the real Docker Desktop).
+
+Working on the UI without Docker: run `pnpm dev`, then open `http://localhost:1420/?mock` (fake backend in `src/dev/mock.ts`, loaded only when `import.meta.env.DEV`). The Playwright scripts use the locally installed macOS Chrome: `node scripts/shots.mjs <dir>` (screenshots) and `node scripts/flows.mjs` (interactive flows; needs Vite running). Use `.tr:visible` when selecting table rows because the Containers page stays mounted.
+
+## Architecture
+
+**The webview never touches the socket or kubeconfig**; every connection, stream and secret lives in the Rust backend. The frontend only calls `invoke` (wrapped in `src/api.ts`; command names follow section 11.2 of the spec, so do not rename existing commands) and listens to events.
+
+Backend (`src-tauri/src`):
+- `state.rs` `AppState`: the active bollard handle, the selected context, a map of background tasks (`spawn_task`/`abort_task`/`abort_prefix`, keyed like `logs:<id>`), exec sessions, and the `Store`.
+- `ctx.rs`: reads `~/.docker/contexts`, connects + `negotiate_version` (required: Docker 27 only speaks up to API 1.47); `ctx_switch` cancels every old stream and then restarts the monitor.
+- `events.rs`: the monitor keeps the `/events` stream, emits `engine://status` and `docker://events`, and reconnects after 1/2/5/10 s; `engine_start/stop` depend on the operating system (macOS Docker Desktop/colima/orb, Linux pkexec systemctl, Windows). `engine_stop` must wait until nothing accepts connections on the socket before returning, otherwise starting again right away leaves Docker Desktop stuck.
+- `containers.rs`, `images.rs`, `netvol.rs`, `prune.rs`, `projects.rs`: the command groups. Streams come back through the events `logs://<id>`, `stats://<id>`, `exec://<sid>`, `pull://progress`, `build://log` and `compose://progress`. For exec, the frontend **generates the `sid` itself and listens first** before calling `exec_open`, so the first output line is not lost.
+- `cli.rs`: the `docker` CLI is only used for `compose`, `build` and the volume commands (a temporary `alpine` container); it always sets `DOCKER_HOST` to the selected endpoint and an extended PATH (`util::cli_path`) because GUI apps do not inherit the shell PATH. tokio `Command::output()` forces stdout into a pipe, so use `spawn()` when output must go to a file.
+- `rawapi.rs`: a raw GET over the socket for `/system/df` (bollard 0.21 only models the API ≥ 1.52 format, so older Docker returns empty data). `Shared` build cache records are excluded from the totals to match `docker system df`.
+- Commands that take an `AppHandle` are all generic over `<R: Runtime>` so they can be tested with the mock app; `generate_handler!` does not accept a turbofish.
+- `store.rs`: local configuration (`store.json` in the app data dir: projects, cleanup schedule, settings, containers running before the engine was stopped). Docker/K8s data is always read directly from the API.
+- A project is a folder with compose/Dockerfile; `Project.composeProject` (the real name used for `-p` and the `com.docker.compose.project` label) is separate from `name` (the display name, renamable). Containers are linked to a project through that label.
+
+Frontend (`src`):
+- `store.ts` (Zustand) is the center: Docker data, `busy` per container/project (3 states running/success/error through toasts), a single modal (`ModalState`; each modal keeps its form state locally), and `terms` (containers that have a terminal open). `init()` is idempotent (React StrictMode). Lists refresh from docker events with a debounce, not polling; only the CPU/RAM columns of the Containers table poll every 5 s while that page is visible.
+- `lib/` holds pure, tested logic: prune list computation (`prune.ts`: a network/volume is "in use" if ANY container, even a stopped one, references it), log levels (`logs.ts`), project status, `.env` masking, formatting.
+- The Containers page stays mounted after the first visit (App.tsx) and each container's `TerminalTab` is kept (hidden) so xterm.js sessions survive selecting another container or changing page; they are removed only when the container stops/restarts/is deleted or the app exits.
+- Separate terminal window: `main.tsx` accepts `?term=<id>` (capability `term-*` in `src-tauri/capabilities/default.json`).
+- Styling uses the prototype's CSS classes (`.btn`, `.card`, `.tr`, `.modal`…) together with inline styles, no Tailwind.
+
+## i18n
+
+- `src/i18n/index.ts`: `t(key, vars?)`; **the key is the original English sentence** (insert values with `{name}`). Each language has its own table: `en.ts` (key → itself) and `vi.ts` (key → Vietnamese). A missing translation falls back to the key, never an error. Every new user-visible string must be wrapped in `t("…")` and added to **both** files (a test checks that the two tables have the same keys, that keys contain no Vietnamese, and that placeholders match).
+- Do not call `t()` at module level (it would freeze the language when the file loads); use functions instead, e.g. `stateLabel()`, `engineLabel()`, `levels()`.
+- The language is changed with the gear button **Settings** (in the header, next to the engine badge; it opens the `preferences` page) through `useApp().setLang`; `App` subscribes to `lang`, so the whole tree re-renders (no remount, terminals stay alive). It is stored in `localStorage` (`dockspan.lang`) and defaults to `en`.
+- Errors returned by the Rust backend are **fixed English text**; `api.ts` translates them to Vietnamese with `tBackend` using the patterns in `VI_BACKEND` (`vi.ts`; `{x}` matches the variable part). When adding a new Rust message, add the matching pattern.
+- Unit tests and the Playwright scripts run in English; only the language-switch step (and the i18n tests) use Vietnamese text. `node scripts/i18n-check.mjs` scans the English UI for untranslated Vietnamese text.

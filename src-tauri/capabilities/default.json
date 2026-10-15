@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for the main window and the separate terminal windows",
+  "windows": ["main", "term-*"],
+  "permissions": [
+    "core:default",
+    "core:webview:allow-create-webview-window",
+    "core:webview:allow-webview-close",
+    "core:window:allow-close",
+    "dialog:default",
+    "opener:default"
+  ]
+}
