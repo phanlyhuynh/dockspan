@@ -24,7 +24,7 @@ fn arr<'a>(v: &'a Value, legacy: &str, new_path: &[&str]) -> Vec<&'a Value> {
 #[tauri::command]
 pub async fn system_df(state: State<'_, AppState>) -> CmdResult<Value> {
     let d = state.docker()?;
-    let endpoint = state.active().endpoint;
+    let endpoint = crate::ctx::raw_endpoint(&state);
     // Prefer the raw GET (stable legacy format); otherwise use bollard (new format).
     let v = match tokio::time::timeout(Duration::from_secs(60), crate::rawapi::get_json(&endpoint, "/system/df")).await {
         Ok(Ok(v)) => v,

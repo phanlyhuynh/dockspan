@@ -38,7 +38,21 @@ export interface ScanResult {
   composeProject: string; services: ServiceInfo[]; warning: string | null;
 }
 
-export interface CtxInfo { id: string; name: string; kind: 'local' | 'ssh' | 'tcp'; endpoint: string; supported: boolean; active: boolean }
+export type CtxKind = 'local' | 'ssh' | 'tcp' | 'wsl';
+export interface CtxInfo {
+  id: string; name: string; kind: CtxKind; endpoint: string; supported: boolean; active: boolean;
+  /** Why the context cannot be used on this machine. */
+  reason: string | null; description: string; source: 'default' | 'docker' | 'app';
+  tls: boolean; tlsDir: string | null; skipTlsVerify: boolean; sshKey: string | null; wslDistro: string | null;
+}
+/** The "Add connection" form. */
+export interface NewCtx {
+  name: string; kind: CtxKind; socket?: string; host?: string; user?: string; port?: number; key?: string;
+  tls?: boolean; certDir?: string; distro?: string;
+}
+/** A host of `~/.ssh/config`, with its effective settings from `ssh -G`. */
+export interface SshHost { alias: string; hostname: string; user: string | null; port: number; identityFile: string | null; proxyJump: string | null }
+export interface WslDistro { name: string; state: string; version: number; default: boolean; added: boolean; checked: boolean; docker: string | null; dockerRunning: boolean }
 export interface EngineInfo { version: string; apiVersion: string; os: string; osType: string; kernel: string; cpus: number; memTotal: number; name: string; latencyMs?: number }
 export interface EngineStatus { state: 'on' | 'off'; ctx: { id: string; name: string; endpoint: string; kind: string }; info?: EngineInfo }
 
@@ -104,6 +118,12 @@ export const api = {
   ctxList: () => call<CtxInfo[]>('ctx_list'),
   ctxTest: (id: string) => call<EngineInfo>('ctx_test', { id }),
   ctxSwitch: (id: string) => call<EngineStatus['ctx']>('ctx_switch', { id }),
+  ctxProbe: (spec: NewCtx) => call<EngineInfo>('ctx_probe', { spec }),
+  ctxAdd: (spec: NewCtx) => call<CtxInfo>('ctx_add', { spec }),
+  ctxRemove: (id: string) => call<void>('ctx_remove', { id }),
+  sshHosts: () => call<SshHost[]>('ssh_hosts'),
+  wslList: () => call<{ available: boolean; distros: WslDistro[] }>('wsl_list'),
+  wslInstallDocker: (distro: string) => call<string>('wsl_install_docker', { distro }),
 
   containers: () => call<Container[]>('containers_list'),
   containersStats: (ids: string[]) => call<Record<string, { cpu: number; memUsed: number; memLimit: number }>>('containers_stats', { ids }),

@@ -78,6 +78,7 @@ export function PaletteModal() {
       act(t("Free up disk space"), 'prune containers, images, cache…', () => s.setView('cleanup')),
       act(s.engine.state === 'on' ? t("Stop Docker Engine") : t("Start Docker Engine"), 'Engine', () => void s.toggleEngine()),
       act(t("Open Kubernetes"), 'pods, deployments, services', () => s.setView('kubernetes')),
+      act(t("Add connection"), 'SSH, TCP + TLS, WSL2, Kubernetes', () => s.openModal({ kind: 'ctxAdd' })),
       act(t("Manage connections"), 'Docker context & cluster', () => s.setView('settings')),
     ];
     const k8s = useK8s.getState();

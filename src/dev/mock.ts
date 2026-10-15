@@ -60,13 +60,23 @@ function ev(type: string, action: string, c: Any) { emit('docker://events', { ty
 
 const LOGS: [string, string][] = [['stdout', 'Server listening on http://0.0.0.0:3000'], ['stdout', 'Connected to postgres://db:5432/myshop'], ['stdout', 'DEBUG Redis client ready (redis:6379)'], ['stdout', 'GET /api/products 200 18ms'], ['stdout', 'GET /api/cart 200 7ms'], ['stdout', 'WARN Slow query: SELECT * FROM orders … 812ms'], ['stderr', 'ERROR POST /api/checkout 500 — payment gateway timeout'], ['stdout', 'GET /health 200 1ms']];
 
+const mCtx = (id: string, kind: string, endpoint: string, extra: Any = {}) => ({ id, name: id, kind, endpoint, supported: true, reason: null, description: '', source: 'docker', tls: false, tlsDir: null, skipTlsVerify: false, sshKey: null, wslDistro: null, ...extra });
+const mCtxs: Any[] = [
+  mCtx('default', 'local', 'unix:///var/run/docker.sock', { name: 'desktop-linux', source: 'default' }),
+  mCtx('colima', 'local', 'unix:///Users/dev/.colima/default/docker.sock'),
+  mCtx('prod-server', 'ssh', 'ssh://deploy@203.0.113.10'),
+  mCtx('staging-tls', 'tcp', 'tcp://10.0.0.25:2376', { tls: true, tlsDir: '/Users/dev/.docker/contexts/tls/x/docker' }),
+];
+const mWsl: Any[] = [
+  { name: 'Ubuntu-24.04', state: 'Running', version: 2, default: true, added: false, checked: true, docker: '27.3.1', dockerRunning: true },
+  { name: 'Debian', state: 'Running', version: 2, default: false, added: false, checked: true, docker: null, dockerRunning: false },
+  { name: 'Alpine', state: 'Stopped', version: 2, default: false, added: false, checked: false, docker: null, dockerRunning: false },
+];
+const mEndpoint = (f: Any) => f.kind === 'ssh' ? `ssh://${f.user ? f.user + '@' : ''}${f.host}${f.port && f.port !== 22 ? ':' + f.port : ''}` : f.kind === 'tcp' ? `tcp://${f.host}` : f.kind === 'wsl' ? `wsl://${f.distro}` : `unix://${f.socket}`;
+
 const handlers: Record<string, (a: Any) => Any> = {
   engine_status: () => ({ state: 'on', ctx: { id: 'default', name: 'desktop-linux', endpoint: 'unix:///var/run/docker.sock', kind: 'local' }, info: { version: '27.3.1', apiVersion: '1.47', os: 'Docker Desktop aarch64', osType: 'linux', kernel: '6.8', cpus: 8, memTotal: 16 * 2 ** 30, name: 'docker-desktop' } }),
-  ctx_list: () => [
-    { id: 'default', name: 'desktop-linux', kind: 'local', endpoint: 'unix:///var/run/docker.sock', supported: true, active: true },
-    { id: 'colima', name: 'colima', kind: 'local', endpoint: 'unix:///Users/dev/.colima/default/docker.sock', supported: true, active: false },
-    { id: 'prod', name: 'prod-server', kind: 'ssh', endpoint: 'ssh://deploy@203.0.113.10', supported: false, active: false },
-  ],
+  ctx_list: () => mCtxs.map((c) => ({ ...c, active: c.id === 'default' })),
   ctx_test: () => ({ version: '27.3.1', apiVersion: '1.47', os: 'Docker Desktop aarch64', cpus: 8, memTotal: 16 * 2 ** 30, latencyMs: 12 }),
   containers_list: () => cs.map((c) => ({ ...c })), containers_stats: (a) => Object.fromEntries(a.ids.map((id: string) => [id, { cpu: 0.2 + (id.charCodeAt(0) % 25) / 10, memUsed: (12 + (id.charCodeAt(1) % 300)) * 2 ** 20, memLimit: 2 ** 30 }])),
   images_list: () => imgs.map((i) => ({ ...i })), networks_list: () => nets.map((n) => ({ ...n })), volumes_list: () => vols.map(({ mb: _mb, ...v }) => v), project_list: () => projects.map((p) => ({ ...p })), schedule_get: () => schedule,
@@ -124,6 +134,30 @@ const handlers: Record<string, (a: Any) => Any> = {
   project_write_file: () => undefined, open_editor: () => undefined, open_in_editor: () => undefined, open_terminal: () => undefined, open_folder: () => undefined, open_url: () => undefined,
   settings_get: () => ({ editorCommand: 'code' }), settings_set: () => undefined,
   home_dir: () => '/Users/dev',
+  ctx_probe: async (a: Any) => {
+    await sleep(600);
+    if (/fail/.test(a.spec.host ?? '')) throw `Could not connect to ${mEndpoint(a.spec)}: ssh: connect to host ${a.spec.host} port 22: Connection timed out`;
+    return { version: '26.1.4', apiVersion: '1.45', os: 'Ubuntu 22.04.4 LTS x86_64', cpus: 4, memTotal: 8 * 2 ** 30, latencyMs: 41 };
+  },
+  ctx_add: (a: Any) => {
+    const f = a.spec;
+    if (mCtxs.some((c) => c.name === f.name)) throw `A connection named ${f.name} already exists`;
+    const c = mCtx(f.name, f.kind, mEndpoint(f), { tls: !!f.tls && f.kind === 'tcp', source: f.kind === 'wsl' ? 'app' : 'docker', wslDistro: f.distro ?? null });
+    mCtxs.push(c);
+    const w = mWsl.find((d) => d.name === f.distro); if (w) w.added = true;
+    return c;
+  },
+  ctx_remove: (a: Any) => { const i = mCtxs.findIndex((c) => c.id === a.id); if (i >= 0) { const [c] = mCtxs.splice(i, 1); const w = mWsl.find((d) => d.name === c.wslDistro); if (w) w.added = false; } },
+  ssh_hosts: () => [
+    { alias: 'build-box', hostname: '203.0.113.20', user: 'deploy', port: 22, identityFile: '~/.ssh/id_ed25519', proxyJump: null },
+    { alias: 'prod-db', hostname: '10.20.0.5', user: 'ops', port: 2222, identityFile: '~/.ssh/id_prod', proxyJump: 'bastion' },
+  ],
+  wsl_list: () => ({ available: true, distros: mWsl.map((d) => ({ ...d })) }),
+  wsl_install_docker: async (a: Any) => {
+    for (const line of ['# Executing docker install script', '+ apt-get install -y docker-ce docker-ce-cli containerd.io', 'Docker 27.3.1']) { emit('wsl://install', { key: a.distro, line }); await sleep(400); }
+    const w = mWsl.find((d) => d.name === a.distro); if (w) { w.docker = '27.3.1'; w.dockerRunning = true; }
+    return '27.3.1';
+  },
 };
 
 // ---------- Kubernetes (fake clusters) ----------

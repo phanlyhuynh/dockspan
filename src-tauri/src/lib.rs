@@ -1,3 +1,4 @@
+mod bridge;
 mod cli;
 mod containers;
 mod ctx;
@@ -8,9 +9,11 @@ mod netvol;
 mod projects;
 mod rawapi;
 mod prune;
+mod sshcfg;
 mod state;
 mod store;
 mod util;
+mod wsl;
 
 #[cfg(test)]
 mod smoke;
@@ -30,7 +33,7 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("cannot determine the app data directory");
             let store = store::Store::load(dir.join("store.json"));
-            let active = ctx::initial_context(store.settings.active_context_id.clone());
+            let active = ctx::initial_context(&store);
             app.manage(AppState {
                 docker: StdMutex::new(None),
                 active: StdMutex::new(active),
@@ -38,6 +41,7 @@ pub fn run() {
                 tasks: StdMutex::new(HashMap::new()),
                 execs: tokio::sync::Mutex::new(HashMap::new()),
                 store: StdMutex::new(store),
+                bridge: StdMutex::new(None),
             });
             app.manage(k8s::K8sState::default());
             events::start_monitor(app.handle());
@@ -45,7 +49,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            ctx::ctx_list, ctx::ctx_test, ctx::ctx_switch,
+            ctx::ctx_list, ctx::ctx_test, ctx::ctx_switch, ctx::ctx_probe, ctx::ctx_add, ctx::ctx_remove,
+            wsl::wsl_list, wsl::wsl_install_docker, sshcfg::ssh_hosts,
             events::engine_status, events::engine_start, events::engine_stop,
             containers::containers_list, containers::container_start, containers::container_stop,
             containers::container_restart, containers::container_remove, containers::container_create,

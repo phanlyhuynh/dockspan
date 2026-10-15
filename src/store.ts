@@ -32,6 +32,7 @@ export type ModalState =
   | { kind: 'pruneConfirm' }
   | { kind: 'schedule' }
   | { kind: 'k8sAdd' }
+  | { kind: 'ctxAdd'; type?: 'local' | 'wsl' | 'ssh' | 'tcp'; distro?: string }
   | { kind: 'podLogs'; clusterId: string; pod: K8sPod }
   | { kind: 'podExec'; clusterId: string; pod: K8sPod };
 
@@ -87,6 +88,8 @@ interface Store {
   engineOk: () => boolean;
   toggleEngine: () => Promise<void>;
   switchCtx: (id: string) => Promise<void>;
+  loadContexts: () => Promise<void>;
+  removeCtx: (c: CtxInfo) => void;
 
   startC: (id: string) => Promise<void>;
   stopC: (id: string) => Promise<void>;
@@ -362,6 +365,28 @@ export const useApp = create<Store>()((set, get) => ({
         get().toast((e as Error).message, 'err');
       }
     }
+  },
+
+  loadContexts: async () => {
+    try { set({ contexts: await api.ctxList() }); } catch (e) { get().toast((e as Error).message, 'err'); }
+  },
+  removeCtx: (c) => {
+    get().ask({
+      title: t("Remove connection {name}?", { name: c.name }),
+      body: c.source === 'app'
+        ? t("Only removes it from the app. The engine and its containers are not touched.")
+        : t("Removes the Docker context (like docker context rm {name}), so it also disappears from docker context ls. The engine and its containers are not touched.", { name: c.name }),
+      yes: t("Remove"), danger: true,
+      action: async () => {
+        try {
+          await api.ctxRemove(c.id);
+          await get().loadContexts();
+          get().toast(t("Removed connection {name}", { name: c.name }), 'info');
+        } catch (e) {
+          get().toast((e as Error).message, 'err');
+        }
+      },
+    });
   },
 
   switchCtx: async (id) => {
