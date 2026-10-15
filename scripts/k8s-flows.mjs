@@ -18,6 +18,8 @@ const nav = (label) => page.locator('nav button.navi', { hasText: label }).first
 
 await page.goto(base);
 await page.waitForSelector('nav', { timeout: 10000 });
+// The cluster list loads in the background after the window appears.
+await page.locator('nav button.navi', { hasText: 'Kubernetes' }).filter({ hasText: '2' }).waitFor({ timeout: 5000 }).catch(() => {});
 ok((await page.locator('nav button.navi', { hasText: 'Kubernetes' }).innerText()).includes('2'), 'sidebar shows the cluster count');
 
 await nav('Kubernetes');

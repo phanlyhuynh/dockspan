@@ -12,6 +12,7 @@ export const ICONS = {
   cleanup: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   kubernetes: 'M12 2.5l8.5 4.1 2 9.2-5.9 7.4H7.4l-5.9-7.4 2-9.2zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 1 0 0-7M12 5v3.5M12 15.5V19M5.5 9.5l3.2 1.4M15.3 13.1l3.2 1.4M18.5 9.5l-3.2 1.4M8.7 13.1l-3.2 1.4',
   settings: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4',
+  ssh: 'M3 5h18v14H3zM7 10l3 2.5L7 15M12.5 15H17',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   restart: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
   terminal: 'M5 7l5 5-5 5M12 18h7',

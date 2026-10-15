@@ -12,6 +12,8 @@ import { Projects } from './views/Projects';
 import { Containers } from './views/Containers';
 import { Images, Networks, Volumes } from './views/Lists';
 import { Kubernetes } from './views/Kubernetes';
+import { Ssh } from './views/Ssh';
+import { useSsh } from './sshStore';
 import { Cleanup } from './views/Cleanup';
 import { Connections } from './views/Connections';
 import { Preferences } from './views/Preferences';
@@ -24,14 +26,18 @@ export function App() {
   const loaded = useApp((s) => s.loaded);
   const seenContainers = useRef(false);
   if (view === 'containers') seenContainers.current = true;
-  // Kubernetes does not depend on Docker: its page is never blurred or covered by the engine banner.
-  const engineOn = useApp((s) => s.engine.state === 'on') || view === 'kubernetes';
+  const seenSsh = useRef(false);
+  if (view === 'ssh') seenSsh.current = true;
+  // Kubernetes and SSH do not depend on Docker: their pages are never blurred or covered by the engine banner.
+  const noDocker = view === 'kubernetes' || view === 'ssh';
+  const engineOn = useApp((s) => s.engine.state === 'on') || noDocker;
 
   useEffect(() => {
     if (!inTauri) return;
     void homeDir().then(setHome).catch(() => {});
     void init().catch((e) => useApp.getState().toast((e as Error).message, 'err'));
     void useK8s.getState().init().catch(() => {});
+    void useSsh.getState().load();
   }, [init]);
 
   // Ctrl K / ⌘K opens the command palette.
@@ -60,7 +66,7 @@ export function App() {
       <Sidebar />
       <main style={{ flex: '999 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Header />
-        {view !== 'kubernetes' && <EngineBanner />}
+        {!noDocker && <EngineBanner />}
         <div className={engineOn ? undefined : 'blur'} style={{ padding: '24px 28px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {!loaded ? <div className="muted">{t("Connecting to Docker…")}</div> : (
             <>
@@ -72,6 +78,8 @@ export function App() {
               {view === 'networks' && <Networks />}
               {view === 'volumes' && <Volumes />}
               {view === 'kubernetes' && <Kubernetes />}
+              {/* Keep the SSH page mounted too, so its terminals survive navigating away. */}
+              {seenSsh.current && <div style={{ display: view === 'ssh' ? 'flex' : 'none', flexDirection: 'column', gap: 20 }}><Ssh visible={view === 'ssh'} /></div>}
               {view === 'cleanup' && <Cleanup />}
               {view === 'settings' && <Connections />}
               {view === 'preferences' && <Preferences />}

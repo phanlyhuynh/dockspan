@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { useApp, usePruneDefs, type EngineState, type View } from '../store';
 import { useK8s } from '../k8sStore';
+import { useSsh } from '../sshStore';
 import { fmtBytes } from '../lib/format';
 import { sumBytes } from '../lib/prune';
 import { ctxTypeLabel } from '../lib/connections';
@@ -23,6 +24,7 @@ export function Sidebar() {
   const projects = useApp((s) => s.projects);
   const contexts = useApp((s) => s.contexts);
   const clusters = useK8s((s) => s.clusters.length);
+  const sshOpen = useSsh((s) => s.sessions.filter((x) => !x.closed).length);
   const engine = useApp((s) => s.engine);
   const ctxMenu = useApp((s) => s.ctxMenu);
   const defs = usePruneDefs();
@@ -37,6 +39,7 @@ export function Sidebar() {
     ['networks', 'Networks', String(networks.length)],
     ['volumes', 'Volumes', String(volumes.length)],
     ['kubernetes', 'Kubernetes', clusters ? String(clusters) : ''],
+    ['ssh', 'SSH', sshOpen ? String(sshOpen) : ''],
     ['cleanup', t("Cleanup"), reclaim > 0 ? fmtBytes(reclaim) : ''],
     ['settings', t("Connections"), String(contexts.length)],
   ];

@@ -52,6 +52,10 @@ export interface NewCtx {
 }
 /** A host of `~/.ssh/config`, with its effective settings from `ssh -G`. */
 export interface SshHost { alias: string; hostname: string; user: string | null; port: number; identityFile: string | null; proxyJump: string | null }
+/** Where an SSH terminal connects: a `~/.ssh/config` alias (host only) or host + optional user / port / key. */
+export interface SshTarget { host: string; user?: string | null; port?: number | null; key?: string | null }
+/** An SSH host added on the SSH page. */
+export interface SavedSsh { name: string; host: string; user: string | null; port: number | null; key: string | null }
 export interface WslDistro { name: string; state: string; version: number; default: boolean; added: boolean; checked: boolean; docker: string | null; dockerRunning: boolean }
 export interface EngineInfo { version: string; apiVersion: string; os: string; osType: string; kernel: string; cpus: number; memTotal: number; name: string; latencyMs?: number }
 export interface EngineStatus { state: 'on' | 'off'; ctx: { id: string; name: string; endpoint: string; kind: string }; info?: EngineInfo }
@@ -122,6 +126,13 @@ export const api = {
   ctxAdd: (spec: NewCtx) => call<CtxInfo>('ctx_add', { spec }),
   ctxRemove: (id: string) => call<void>('ctx_remove', { id }),
   sshHosts: () => call<SshHost[]>('ssh_hosts'),
+  sshOpen: (sid: string, target: SshTarget, cols: number, rows: number) => call<void>('ssh_open', { sid, target, cols, rows }),
+  sshWrite: (sid: string, data: string) => call<void>('ssh_write', { sid, data }),
+  sshResize: (sid: string, cols: number, rows: number) => call<void>('ssh_resize', { sid, cols, rows }),
+  sshClose: (sid: string) => call<void>('ssh_close', { sid }),
+  sshSavedList: () => call<SavedSsh[]>('ssh_saved_list'),
+  sshSavedAdd: (host: SavedSsh) => call<SavedSsh>('ssh_saved_add', { host }),
+  sshSavedRemove: (name: string) => call<void>('ssh_saved_remove', { name }),
   wslList: () => call<{ available: boolean; distros: WslDistro[] }>('wsl_list'),
   wslInstallDocker: (distro: string) => call<string>('wsl_install_docker', { distro }),
 
