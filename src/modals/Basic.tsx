@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Schedule } from '../api';
 import { useApp, usePruneDefs } from '../store';
 import { useK8s } from '../k8sStore';
+import { useSsh } from '../sshStore';
+import { sshEntries } from '../lib/ssh';
 import { fmtBytes } from '../lib/format';
 import { selectedTotal, sumBytes } from '../lib/prune';
 import { imgRef, shortPath, stateLabel } from '../lib/ui';
@@ -87,7 +89,8 @@ export function PaletteModal() {
     const cts: PalItem[] = s.containers.map((c) => ({ kind: 'Container', label: c.name, sub: `${c.image} · ${stateLabel(c.state)}`, run: () => { close(); useApp.setState({ view: 'containers', selected: c.id, cq: '', onlyRunning: false }); } }));
     const prs: PalItem[] = s.projects.map((p) => ({ kind: t("Projects"), label: p.name, sub: shortPath(p.path), run: () => { close(); s.openModal({ kind: 'files', projectId: p.id }); } }));
     const ims: PalItem[] = s.images.filter((im) => !im.dangling).map((im) => ({ kind: 'Image', label: imgRef(im), sub: fmtBytes(im.size), run: () => { close(); useApp.setState({ view: 'images' }); s.openModal({ kind: 'image', ref: imgRef(im) }); } }));
-    const all = [...actions, ...ctxs, ...cls, ...cts, ...prs, ...ims];
+    const sshs: PalItem[] = sshEntries(useSsh.getState().config, s.contexts, useSsh.getState().saved).map((e) => ({ kind: 'SSH', label: t("SSH to {name}", { name: e.name }), sub: e.address, run: () => { close(); s.setView('ssh'); useSsh.getState().open(e); } }));
+    const all = [...actions, ...ctxs, ...cls, ...sshs, ...cts, ...prs, ...ims];
     const query = q.trim();
     if (!query) return [...actions, ...cts.slice(0, 4)].slice(0, 10);
     return all

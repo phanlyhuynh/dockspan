@@ -21,6 +21,11 @@ settings resolved with `ssh -G`); picking one keeps the alias as the host, so ev
 page also lists WSL2 distros (`wsl.exe -l -v`), with the Docker version inside each running one and “Install Docker Engine”
 (the get.docker.com script). Start/stop works for local and WSL2 engines; remote ones are started on their own machine.
 
+SSH page (independent of Docker): lists the hosts of `~/.ssh/config`, SSH Docker contexts and hosts added in the app, and
+opens any number of terminal tabs per host. The system `ssh` runs in a real pseudo-terminal (`portable-pty`: openpty on
+macOS/Linux, ConPTY on Windows), so password prompts, host-key questions, vim/htop and resizing work. Terminals survive
+changing page and can be moved to a separate window; an ended session keeps its output and offers “Reconnect”.
+
 Kubernetes (independent of the Docker context): clusters are the contexts of `$KUBECONFIG` / `~/.kube/config` plus contexts
 added from other kubeconfig files (the kubeconfig is never modified; “Remove” only hides a cluster in the app). Per cluster:
 version/nodes check, namespace filter, Deployments (scale, rollout restart), Pods (status like `kubectl`, logs with
@@ -54,7 +59,8 @@ The integration tests create/delete resources prefixed with `dockspan-smoke`, pu
 and **never run prune**. If the engine is stopped, the tests start it with the same command the “Start” button uses.
 
 Multi-engine test (`multi_engine_flow`): adds, tests, switches to, uses (CLI, exec) and removes an SSH, TCP+TLS and/or WSL2
-connection, with a temporary `DOCKER_CONFIG`. Each part runs only when its variables are set: `DOCKSPAN_SSH=user@host:port`
+connection, with a temporary `DOCKER_CONFIG`. `ssh_terminal_flow` (same `DOCKSPAN_SSH`/`DOCKSPAN_SSH_KEY`) drives a real
+PTY session: host-key question, a command, a resize seen by the remote shell, two sessions at once, `exit`, and a refused port. Each part runs only when its variables are set: `DOCKSPAN_SSH=user@host:port`
 (+ `DOCKSPAN_SSH_KEY`, the host must already be in `known_hosts`), `DOCKSPAN_TLS=host:port` + `DOCKSPAN_TLS_CERTS=<dir>`,
 `DOCKSPAN_WSL=<distro>`. A throwaway setup: an `alpine` container running `sshd` + `docker-cli` with the Docker socket mounted,
 and `docker run --privileged -e DOCKER_TLS_CERTDIR=/certs -p 127.0.0.1:23760:2376 docker:27-dind` (copy `/certs/client` out
@@ -82,6 +88,7 @@ node scripts/flows.mjs                # check the interactive flows
 node scripts/i18n-check.mjs           # find untranslated Vietnamese text in the English UI
 node scripts/k8s-flows.mjs <dir>      # Kubernetes page flows (falls back to Playwright's Chromium when Chrome is missing)
 node scripts/conn-flows.mjs <dir>     # Add/remove SSH, TCP+TLS, WSL2 connections, install Docker in a distro
+node scripts/ssh-flows.mjs <dir>      # SSH page: hosts, several terminals, add/remove host, palette
 ```
 
 ## Structure
@@ -97,6 +104,7 @@ src/                 React frontend
 src-tauri/src/       Rust backend
   ctx.rs events.rs   Docker contexts (read/write ~/.docker/contexts), connection, engine monitoring (/events, auto-reconnect 1/2/5/10 s), engine start/stop
   bridge.rs wsl.rs   SSH/WSL2 bridge (docker system dial-stdio), WSL2 distro list and Docker install
+  sshcfg.rs sshterm.rs  ~/.ssh/config hosts (ssh -G), interactive SSH terminals in a PTY
   containers.rs      Listing, lifecycle, logs/stats (streams), exec (terminal)
   k8s.rs             Kubernetes (kube-rs): clusters from kubeconfig, lists/watch, scale/restart/delete, logs, exec, port-forward
   images.rs netvol.rs prune.rs projects.rs cli.rs rawapi.rs store.rs

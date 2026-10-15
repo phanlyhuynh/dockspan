@@ -79,6 +79,17 @@ pub struct WslCtx {
     pub distro: String,
 }
 
+/// An SSH host added on the SSH page (hosts of `~/.ssh/config` are read from the file, not stored).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSsh {
+    pub name: String,
+    pub host: String,
+    pub user: Option<String>,
+    pub port: Option<u16>,
+    pub key: Option<String>,
+}
+
 /// A kubeconfig context added from a file other than the default kubeconfig.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -119,6 +130,8 @@ pub struct Store {
     /// SSH private key per Docker context name (docker contexts have no place for it).
     #[serde(default)]
     pub ssh_keys: HashMap<String, String>,
+    #[serde(default)]
+    pub ssh_saved: Vec<SavedSsh>,
     #[serde(skip)]
     pub path: PathBuf,
 }

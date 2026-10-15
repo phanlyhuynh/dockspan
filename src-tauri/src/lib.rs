@@ -10,6 +10,7 @@ mod projects;
 mod rawapi;
 mod prune;
 mod sshcfg;
+mod sshterm;
 mod state;
 mod store;
 mod util;
@@ -44,6 +45,7 @@ pub fn run() {
                 bridge: StdMutex::new(None),
             });
             app.manage(k8s::K8sState::default());
+            app.manage(sshterm::SshState::default());
             events::start_monitor(app.handle());
             prune::start_scheduler(app.handle());
             Ok(())
@@ -51,6 +53,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ctx::ctx_list, ctx::ctx_test, ctx::ctx_switch, ctx::ctx_probe, ctx::ctx_add, ctx::ctx_remove,
             wsl::wsl_list, wsl::wsl_install_docker, sshcfg::ssh_hosts,
+            sshterm::ssh_open, sshterm::ssh_write, sshterm::ssh_resize, sshterm::ssh_close,
+            sshterm::ssh_saved_list, sshterm::ssh_saved_add, sshterm::ssh_saved_remove,
             events::engine_status, events::engine_start, events::engine_stop,
             containers::containers_list, containers::container_start, containers::container_stop,
             containers::container_restart, containers::container_remove, containers::container_create,

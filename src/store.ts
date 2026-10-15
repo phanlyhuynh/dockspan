@@ -8,7 +8,7 @@ import { DEFAULT_PRUNE_SEL, computePruneDefs, selectedTotal, type PruneId } from
 import { imgRef, withTag } from './lib/ui';
 import { getLang, setLang as applyLang, t, type Lang } from './i18n';
 
-export type View = 'dashboard' | 'projects' | 'containers' | 'images' | 'networks' | 'volumes' | 'kubernetes' | 'cleanup' | 'settings' | 'preferences';
+export type View = 'dashboard' | 'projects' | 'containers' | 'images' | 'networks' | 'volumes' | 'kubernetes' | 'ssh' | 'cleanup' | 'settings' | 'preferences';
 export type Tab = 'logs' | 'terminal' | 'stats' | 'inspect';
 export type ToastKind = 'ok' | 'info' | 'err';
 export interface Toast { id: string; msg: string; kind: ToastKind }
@@ -32,6 +32,7 @@ export type ModalState =
   | { kind: 'pruneConfirm' }
   | { kind: 'schedule' }
   | { kind: 'k8sAdd' }
+  | { kind: 'sshAdd' }
   | { kind: 'ctxAdd'; type?: 'local' | 'wsl' | 'ssh' | 'tcp'; distro?: string }
   | { kind: 'podLogs'; clusterId: string; pod: K8sPod }
   | { kind: 'podExec'; clusterId: string; pod: K8sPod };

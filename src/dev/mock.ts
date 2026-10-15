@@ -72,6 +72,7 @@ const mWsl: Any[] = [
   { name: 'Debian', state: 'Running', version: 2, default: false, added: false, checked: true, docker: null, dockerRunning: false },
   { name: 'Alpine', state: 'Stopped', version: 2, default: false, added: false, checked: false, docker: null, dockerRunning: false },
 ];
+const mSaved: Any[] = [{ name: 'lab-pi', host: '192.168.1.9', user: 'pi', port: null, key: null }];
 const mEndpoint = (f: Any) => f.kind === 'ssh' ? `ssh://${f.user ? f.user + '@' : ''}${f.host}${f.port && f.port !== 22 ? ':' + f.port : ''}` : f.kind === 'tcp' ? `tcp://${f.host}` : f.kind === 'wsl' ? `wsl://${f.distro}` : `unix://${f.socket}`;
 
 const handlers: Record<string, (a: Any) => Any> = {
@@ -148,6 +149,11 @@ const handlers: Record<string, (a: Any) => Any> = {
     return c;
   },
   ctx_remove: (a: Any) => { const i = mCtxs.findIndex((c) => c.id === a.id); if (i >= 0) { const [c] = mCtxs.splice(i, 1); const w = mWsl.find((d) => d.name === c.wslDistro); if (w) w.added = false; } },
+  ssh_open: (a: Any) => { setTimeout(() => emit(`exec://${a.sid}`, { t: 'data', d: btoa(`Welcome to Ubuntu 24.04 LTS\r\n${a.target.user ?? 'ops'}@${a.target.host}:~$ `) }), 120); },
+  ssh_write: () => undefined, ssh_resize: () => undefined, ssh_close: () => undefined,
+  ssh_saved_list: () => mSaved.map((x) => ({ ...x })),
+  ssh_saved_add: (a: Any) => { if (mSaved.some((x) => x.name === a.host.name)) throw `A host named ${a.host.name} already exists`; mSaved.push(a.host); return a.host; },
+  ssh_saved_remove: (a: Any) => { const i = mSaved.findIndex((x) => x.name === a.name); if (i >= 0) mSaved.splice(i, 1); },
   ssh_hosts: () => [
     { alias: 'build-box', hostname: '203.0.113.20', user: 'deploy', port: 22, identityFile: '~/.ssh/id_ed25519', proxyJump: null },
     { alias: 'prod-db', hostname: '10.20.0.5', user: 'ops', port: 2222, identityFile: '~/.ssh/id_prod', proxyJump: 'bastion' },

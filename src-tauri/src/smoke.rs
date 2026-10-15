@@ -700,3 +700,68 @@ async fn ssh_hosts_probe() {
         println!("{} → user:{} port:{} key:{} jump:{}", h.alias, h.user.is_some(), h.port, h.identity_file.is_some(), h.proxy_jump.is_some());
     }
 }
+
+/// Interactive SSH terminal in a real PTY: host-key question answered in the terminal, a command, a resize seen by the
+/// remote shell, two sessions at once, and `exit` closing the session. Needs `DOCKSPAN_SSH` (`user@host:port`) +
+/// `DOCKSPAN_SSH_KEY`; when the host is not in known_hosts yet the test answers "yes" (remove it afterwards with ssh-keygen -R).
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn ssh_terminal_flow() {
+    use crate::sshterm::{self, SshTarget};
+    let v = std::env::var("DOCKSPAN_SSH").expect("set DOCKSPAN_SSH");
+    let (dest, port) = v.rsplit_once(':').map(|(a, b)| (a.to_string(), b.parse().ok())).unwrap();
+    let (user, host) = dest.split_once('@').map(|(u, h)| (Some(u.to_string()), h.to_string())).unwrap();
+    let target = SshTarget { host, user, port, key: std::env::var("DOCKSPAN_SSH_KEY").ok() };
+    let app = mk_app();
+    app.manage(sshterm::SshState::default());
+    let h = app.handle().clone();
+    let text = |buf: &Arc<StdMutex<Vec<String>>>| -> String {
+        let b64 = base64::engine::general_purpose::STANDARD;
+        buf.lock().unwrap().iter().filter_map(|p| serde_json::from_str::<serde_json::Value>(p).ok()).filter_map(|v| v["d"].as_str().and_then(|d| b64.decode(d).ok())).map(|b| String::from_utf8_lossy(&b).to_string()).collect()
+    };
+    async fn until(f: impl Fn() -> bool, secs: u64) -> bool {
+        for _ in 0..secs * 10 {
+            if f() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        false
+    }
+    let a = collect(&app, "exec://ssha");
+    sshterm::ssh_open(h.clone(), h.state(), "ssha".into(), target.clone(), 100, 30).expect("open");
+    // Either the host-key question (answered in the terminal, like a user would) or a shell prompt.
+    assert!(until(|| { let t = text(&a); t.contains("continue connecting") || t.contains('#') || t.contains('$') }, 15).await, "no prompt: {:?}", text(&a));
+    if text(&a).contains("continue connecting") {
+        sshterm::ssh_write(h.state(), "ssha".into(), "yes\n".into()).unwrap();
+        assert!(until(|| text(&a).contains('#'), 15).await, "no shell after yes: {:?}", text(&a));
+    }
+    sshterm::ssh_write(h.state(), "ssha".into(), "echo pty-$((6*7)); stty size\n".into()).unwrap();
+    assert!(until(|| text(&a).contains("pty-42") && text(&a).contains("30 100"), 10).await, "{:?}", text(&a));
+    sshterm::ssh_resize(h.state(), "ssha".into(), 132, 41).unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    sshterm::ssh_write(h.state(), "ssha".into(), "stty size\n".into()).unwrap();
+    assert!(until(|| text(&a).contains("41 132"), 10).await, "resize not seen: {:?}", text(&a));
+
+    // A second session at the same time.
+    let b = collect(&app, "exec://sshb");
+    sshterm::ssh_open(h.clone(), h.state(), "sshb".into(), target.clone(), 80, 24).expect("open b");
+    assert!(until(|| text(&b).contains('#'), 15).await, "{:?}", text(&b));
+    sshterm::ssh_write(h.state(), "sshb".into(), "echo second-$((1+1))\n".into()).unwrap();
+    assert!(until(|| text(&b).contains("second-2"), 10).await);
+    assert!(!text(&a).contains("second-2"), "output leaked between sessions");
+
+    // `exit` ends a session by itself; ssh_close kills the other one.
+    sshterm::ssh_write(h.state(), "ssha".into(), "exit\n".into()).unwrap();
+    assert!(wait_for(&a, "\"close\"", 10).await, "no close after exit");
+    assert!(sshterm::ssh_write(h.state(), "ssha".into(), "x".into()).is_err(), "session still open after exit");
+    sshterm::ssh_close(h.state(), "sshb".into());
+    assert!(wait_for(&b, "\"close\"", 10).await, "no close after ssh_close");
+
+    // Wrong port: the ssh error is shown in the terminal and the session closes with a non-zero code.
+    let c = collect(&app, "exec://sshc");
+    sshterm::ssh_open(h.clone(), h.state(), "sshc".into(), SshTarget { port: Some(1), ..target }, 80, 24).expect("open c");
+    assert!(wait_for(&c, "\"close\"", 15).await);
+    assert!(text(&c).contains("refused"), "{:?}", text(&c));
+    println!("ssh terminal flow OK");
+}
