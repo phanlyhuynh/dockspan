@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type CtxInfo } from '../api';
 import { useApp } from '../store';
+import { useK8s } from '../k8sStore';
+import { clusterDot } from './Kubernetes';
 import { fmtMem } from '../lib/format';
-import { Icon, ICONS, PageHead } from '../components/ui';
+import { Icon, IconBtn, ICONS, PageHead } from '../components/ui';
 import { t } from '../i18n';
 
 const TYPE_LABEL: Record<string, string> = { local: 'Local', ssh: 'SSH', tcp: 'TCP' };
@@ -34,7 +36,7 @@ export function Connections() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
       <PageHead title={t("Connections")} sub={t("Docker contexts (local, WSL2, SSH, TCP) and Kubernetes clusters")}>
-        <button className="btn pri" onClick={() => s.openModal({ kind: 'info', title: t("Add connection"), body: t("Adding WSL2, SSH, TCP/TLS and Kubernetes connections is planned for phases 4–5 of the roadmap.\\n\\nFor now the app uses the existing Docker contexts from `docker context ls`; create more with `docker context create` and reopen this list.") })}>
+        <button className="btn pri" onClick={() => s.openModal({ kind: 'info', title: t("Add connection"), body: t("Adding WSL2, SSH and TCP/TLS connections is planned for phase 4 of the roadmap.\\n\\nFor now the app uses the existing Docker contexts from `docker context ls`; create more with `docker context create` and reopen this list. Kubernetes clusters are added with “Add cluster” below.") })}>
           <Icon d={ICONS.plus} />{t("Add connection")}
         </button>
       </PageHead>
@@ -81,10 +83,62 @@ export function Connections() {
         </div>
       </section>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="secth"><h2 className="h2">Kubernetes clusters</h2></div>
-        <div className="card empty">{t("Not supported in this version (phase 5).")}</div>
-      </section>
+      <Clusters />
     </div>
+  );
+}
+
+function Clusters() {
+  const k = useK8s();
+  const s = useApp();
+  const open = (id: string) => { s.setView('kubernetes'); void k.select(id); };
+  const test = async (id: string, name: string) => {
+    const r = await k.check(id);
+    if (r) s.toast(t("{name}: connection OK · Kubernetes {version} · {latencyMs} ms", { name, version: r.version, latencyMs: r.latencyMs }));
+  };
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="secth">
+        <h2 className="h2">Kubernetes clusters</h2>
+        <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <span className="muted" style={{ fontSize: 13 }}>{t("Read from kubeconfig; independent of the Docker context")}</span>
+          <button className="btn sm" onClick={() => s.openModal({ kind: 'k8sAdd' })}>{t("+ Add cluster")}</button>
+        </span>
+      </div>
+      {k.loaded && !k.clusters.length && <div className="card empty">{t("No clusters yet. Add one from a kubeconfig file to start.")}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+        {k.clusters.map((c) => {
+          const st = k.status[c.id];
+          const pill =
+            st?.state === 'ok' ? [t("Ready"), 'pill run']
+            : st?.state === 'auth' ? [t("Needs login"), 'pill bad']
+            : st?.state === 'offline' ? ['Offline', 'pill bad']
+            : st?.state === 'checking' ? [t("Connecting…"), 'pill part']
+            : [t("Not checked"), 'pill'];
+          const ck = st?.check;
+          const meta = st?.error && st.state !== 'checking' ? st.error
+            : ck ? `Kubernetes ${ck.version} · ${ck.nodes == null ? t("nodes hidden (no permission)") : t("{n} nodes", { n: ck.nodes })}`
+            : `${c.kubeContext} · ${c.kubeconfigPath}`;
+          return (
+            <div key={c.id} className={`card${c.id === k.activeId ? ' cur' : ''}`} style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+                <span className="tag" style={{ alignSelf: 'center' }}>K8s</span>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}><span className={clusterDot(st?.state)} />{c.name}</span>
+                  <span className="mono muted ell" style={{ fontSize: 12 }} title={c.server}>{c.server}</span>
+                </div>
+                <span className={pill[1]}>{pill[0]}</span>
+              </div>
+              <span className="mono ell" style={{ fontSize: 12.5, color: st?.error ? '#F2A8A8' : '#8F98A8' }} title={meta}>{meta}</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button className="btn sm pri" onClick={() => open(c.id)}>{t("Open")}</button>
+                <button className="btn sm" disabled={st?.state === 'checking'} onClick={() => void test(c.id, c.name)}>{t("Check")}</button>
+                <IconBtn icon={ICONS.trash} label={t("Remove cluster")} style={{ marginLeft: 'auto' }} onClick={() => k.remove(c)} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

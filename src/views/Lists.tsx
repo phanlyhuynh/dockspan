@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useApp } from '../store';
 import { fmtBytes, relTime, shortId } from '../lib/format';
 import { imgRef } from '../lib/ui';
-import { Icon, IconBtn, ICONS, PageHead } from '../components/ui';
+import { IconBtn, ICONS, PageHead } from '../components/ui';
 import { t } from '../i18n';
 
 // ---------------------------------------------------------------- Images
@@ -131,19 +131,6 @@ export function Volumes() {
             );
           })}
         </div>
-      </div>
-    </div>
-  );
-}
-
-export function Kubernetes() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <PageHead title="Kubernetes" sub={t("Clusters, workloads, pods, services and port-forward")} />
-      <div className="card empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 48 }}>
-        <Icon d={ICONS.kubernetes} size={32} stroke="#8F98A8" sw={1.5} />
-        <span style={{ color: '#C9D0DC', fontSize: 15, fontWeight: 600 }}>{t("Kubernetes is planned for phase 5 of the roadmap")}</span>
-        <span style={{ maxWidth: 460 }}>{t("This version focuses on Docker on this machine (phases 1–3). In phase 5 the app will read kubeconfig and use kube-rs to list workloads, pods, logs and port-forwards.")}</span>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { useApp, usePruneDefs, type EngineState, type View } from '../store';
+import { useK8s } from '../k8sStore';
 import { fmtBytes } from '../lib/format';
 import { sumBytes } from '../lib/prune';
 import { Icon, ICONS } from './ui';
@@ -20,6 +21,7 @@ export function Sidebar() {
   const volumes = useApp((s) => s.volumes);
   const projects = useApp((s) => s.projects);
   const contexts = useApp((s) => s.contexts);
+  const clusters = useK8s((s) => s.clusters.length);
   const engine = useApp((s) => s.engine);
   const ctxMenu = useApp((s) => s.ctxMenu);
   const defs = usePruneDefs();
@@ -33,7 +35,7 @@ export function Sidebar() {
     ['images', 'Images', String(images.length)],
     ['networks', 'Networks', String(networks.length)],
     ['volumes', 'Volumes', String(volumes.length)],
-    ['kubernetes', 'Kubernetes', ''],
+    ['kubernetes', 'Kubernetes', clusters ? String(clusters) : ''],
     ['cleanup', t("Cleanup"), reclaim > 0 ? fmtBytes(reclaim) : ''],
     ['settings', t("Connections"), String(contexts.length)],
   ];
@@ -101,7 +103,7 @@ function ContextMenu() {
         </button>
       ))}
       <div style={{ height: 1, background: '#2F3644', margin: '4px 0' }} />
-      <button className="mi" onClick={() => openModal({ kind: 'info', title: t("Add connection"), body: t("Adding WSL2, SSH, TCP/TLS and Kubernetes connections is planned for phases 4–5 of the roadmap.\\n\\nFor now the app uses the existing Docker contexts from `docker context ls` (local sockets).") })}>{t("Add connection…")}</button>
+      <button className="mi" onClick={() => openModal({ kind: 'info', title: t("Add connection"), body: t("Adding WSL2, SSH and TCP/TLS connections is planned for phase 4 of the roadmap.\\n\\nFor now the app uses the existing Docker contexts from `docker context ls` (local sockets). Kubernetes clusters are added with “Add cluster” on the Kubernetes page.") })}>{t("Add connection…")}</button>
       <button className="mi" onClick={() => setView('settings')}>{t("Manage connections")}</button>
     </div>
   );

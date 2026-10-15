@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { homeDir } from '@tauri-apps/api/path';
 import { inTauri } from './api';
 import { useApp } from './store';
+import { useK8s } from './k8sStore';
 import { setHome } from './lib/ui';
 import { EngineBanner, Header, Sidebar } from './components/Shell';
 import { Toasts } from './components/ui';
@@ -9,7 +10,8 @@ import { ModalRoot } from './modals/ModalRoot';
 import { Dashboard } from './views/Dashboard';
 import { Projects } from './views/Projects';
 import { Containers } from './views/Containers';
-import { Images, Kubernetes, Networks, Volumes } from './views/Lists';
+import { Images, Networks, Volumes } from './views/Lists';
+import { Kubernetes } from './views/Kubernetes';
 import { Cleanup } from './views/Cleanup';
 import { Connections } from './views/Connections';
 import { Preferences } from './views/Preferences';
@@ -22,12 +24,14 @@ export function App() {
   const loaded = useApp((s) => s.loaded);
   const seenContainers = useRef(false);
   if (view === 'containers') seenContainers.current = true;
-  const engineOn = useApp((s) => s.engine.state === 'on');
+  // Kubernetes does not depend on Docker: its page is never blurred or covered by the engine banner.
+  const engineOn = useApp((s) => s.engine.state === 'on') || view === 'kubernetes';
 
   useEffect(() => {
     if (!inTauri) return;
     void homeDir().then(setHome).catch(() => {});
     void init().catch((e) => useApp.getState().toast((e as Error).message, 'err'));
+    void useK8s.getState().init().catch(() => {});
   }, [init]);
 
   // Ctrl K / ⌘K opens the command palette.
@@ -56,7 +60,7 @@ export function App() {
       <Sidebar />
       <main style={{ flex: '999 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Header />
-        <EngineBanner />
+        {view !== 'kubernetes' && <EngineBanner />}
         <div className={engineOn ? undefined : 'blur'} style={{ padding: '24px 28px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {!loaded ? <div className="muted">{t("Connecting to Docker…")}</div> : (
             <>

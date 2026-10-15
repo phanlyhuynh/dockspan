@@ -1,4 +1,4 @@
-//! App-local configuration (projects, cleanup schedule, settings). Docker data is not stored here.
+//! App-local configuration (projects, cleanup schedule, settings, Kubernetes clusters). Docker/K8s data is not stored here.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -71,6 +71,27 @@ impl Default for Settings {
     }
 }
 
+/// A kubeconfig context added from a file other than the default kubeconfig.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtraCluster {
+    pub path: String,
+    pub context: String,
+}
+
+/// Kubernetes settings. Clusters are the contexts of the default kubeconfig (`$KUBECONFIG` or `~/.kube/config`)
+/// minus `hidden`, plus `extra`; the kubeconfig itself is never modified.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct KubeCfg {
+    #[serde(default)]
+    pub active_cluster_id: Option<String>,
+    #[serde(default)]
+    pub hidden: Vec<String>,
+    #[serde(default)]
+    pub extra: Vec<ExtraCluster>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
@@ -83,6 +104,8 @@ pub struct Store {
     /// Containers that were running right before the app stopped the engine, per context.
     #[serde(default)]
     pub was_running: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub kube: KubeCfg,
     #[serde(skip)]
     pub path: PathBuf,
 }

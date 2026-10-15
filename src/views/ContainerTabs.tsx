@@ -105,15 +105,32 @@ export function LogsTab({ c }: { c: Container }) {
 
 const b64 = (d: string) => Uint8Array.from(atob(d), (ch) => ch.charCodeAt(0));
 
-/** xterm.js terminal attached to a container's `docker exec`. Used by the tab and the separate window. */
-export function TerminalView({ containerId, shell, height, onClosed, onShell }: { containerId: string; shell: 'auto' | 'sh' | 'bash'; height?: number | string; onClosed: () => void; onShell?: (s: string) => void }) {
+/** Where a terminal session runs; both stream `exec://<sid>` events. Defaults to `docker exec` into `containerId`. */
+export interface ExecBackend {
+  open: (sid: string, shell: string, cols: number, rows: number) => Promise<{ shell: string }>;
+  write: (sid: string, data: string) => Promise<void>;
+  resize: (sid: string, cols: number, rows: number) => Promise<void>;
+  close: (sid: string) => Promise<void>;
+}
+
+const dockerExec = (containerId: string): ExecBackend => ({
+  open: (sid, shell, cols, rows) => api.execOpen(sid, containerId, shell, cols, rows),
+  write: api.execWrite, resize: api.execResize, close: api.execClose,
+});
+
+/** xterm.js terminal attached to a container's `docker exec` (or another `backend`, e.g. a pod). Used by the tab and the separate window. */
+export function TerminalView({ containerId, shell, height, onClosed, onShell, backend }: { containerId: string; shell: 'auto' | 'sh' | 'bash'; height?: number | string; onClosed: () => void; onShell?: (s: string) => void; backend?: ExecBackend }) {
   const host = useRef<HTMLDivElement>(null);
   const closedRef = useRef(onClosed);
   closedRef.current = onClosed;
   const shellRef = useRef(onShell);
   shellRef.current = onShell;
+  // Read once per session: `containerId` identifies the session, a new backend object each render must not reopen it.
+  const backendRef = useRef(backend);
+  backendRef.current = backend;
 
   useEffect(() => {
+    const be = backendRef.current ?? dockerExec(containerId);
     const el = host.current;
     if (!el) return;
     const term = new Terminal({
@@ -131,11 +148,11 @@ export function TerminalView({ containerId, shell, height, onClosed, onShell }: 
     let un: (() => void) | undefined;
     let resizeT: ReturnType<typeof setTimeout> | undefined;
 
-    const dataSub = term.onData((d) => { if (opened) void api.execWrite(sid, d).catch(() => {}); });
+    const dataSub = term.onData((d) => { if (opened) void be.write(sid, d).catch(() => {}); });
     const ro = new ResizeObserver(() => {
       try { fit.fit(); } catch { return; }
       clearTimeout(resizeT);
-      resizeT = setTimeout(() => { if (opened) void api.execResize(sid, term.cols, term.rows).catch(() => {}); }, 120);
+      resizeT = setTimeout(() => { if (opened) void be.resize(sid, term.cols, term.rows).catch(() => {}); }, 120);
     });
     ro.observe(el);
 
@@ -147,10 +164,10 @@ export function TerminalView({ containerId, shell, height, onClosed, onShell }: 
       });
       if (disposed) { un(); return; }
       try {
-        const r = await api.execOpen(sid, containerId, shell, term.cols, term.rows);
+        const r = await be.open(sid, shell, term.cols, term.rows);
         opened = true;
         shellRef.current?.(r.shell.split('/').pop() ?? '');
-        if (disposed) void api.execClose(sid).catch(() => {});
+        if (disposed) void be.close(sid).catch(() => {});
         else term.focus();
       } catch (e) {
         term.write(`\x1b[31m${(e as Error).message}\x1b[0m\r\n`);
@@ -163,7 +180,7 @@ export function TerminalView({ containerId, shell, height, onClosed, onShell }: 
       ro.disconnect();
       dataSub.dispose();
       un?.();
-      if (opened) void api.execClose(sid).catch(() => {});
+      if (opened) void be.close(sid).catch(() => {});
       // xterm schedules a redraw for the next frame; disposing right after open causes a `dimensions` error.
       setTimeout(() => term.dispose(), 80);
     };

@@ -390,3 +390,189 @@ async fn stop_probe() {
     println!("t={:?} +2s state={:?}", t0.elapsed(), state_of(containers::containers_list(h.state()).await.unwrap()));
     containers::container_remove(h.state(), id, true).await.unwrap();
 }
+
+// ---------------------------------------------------------------- Kubernetes
+
+fn mk_k8s_app() -> App<MockRuntime> {
+    let app = mk_app();
+    app.manage(crate::k8s::K8sState::default());
+    app
+}
+
+/// READ-ONLY probe of a real cluster: version, namespaces, lists and a pod log (no follow).
+/// Uses `$DOCKSPAN_K8S_CONTEXT`, otherwise the kubeconfig current context. Never writes anything.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn k8s_read_probe() {
+    use crate::k8s;
+    let app = mk_k8s_app();
+    let h = app.handle().clone();
+    let all = k8s::k8s_clusters(h.state());
+    println!("clusters: {}", all["clusters"].as_array().unwrap().len());
+    let id = std::env::var("DOCKSPAN_K8S_CONTEXT").ok().unwrap_or_else(|| all["activeId"].as_str().unwrap().to_string());
+    let info = k8s::k8s_test(h.state(), h.state(), id.clone(), None).await.expect("k8s_test");
+    println!("test: {}", info);
+    let ns = k8s::k8s_namespaces(h.state(), h.state(), id.clone()).await.expect("namespaces");
+    println!("namespaces: {:?}", ns);
+    for kind in ["deployments", "pods", "services"] {
+        let rows = k8s::k8s_list(h.state(), h.state(), id.clone(), kind.into(), None).await.expect(kind);
+        println!("{}: {}", kind, rows.len());
+        if let Some(r) = rows.first() {
+            println!("  first: {}", r);
+        }
+    }
+    let pods = k8s::k8s_list(h.state(), h.state(), id.clone(), "pods".into(), None).await.unwrap();
+    if let Some(p) = pods.iter().find(|p| p["status"] == "Running") {
+        let buf = collect(&app, "k8s://logs/probe");
+        k8s::k8s_logs(h.clone(), h.state(), h.state(), "probe".into(), id.clone(), p["namespace"].as_str().unwrap().into(), p["name"].as_str().unwrap().into(), None, false, false, Some(5))
+            .await
+            .expect("logs");
+        assert!(wait_for(&buf, "\"end\"", 15).await, "log stream did not end");
+        println!("log batches: {}", buf.lock().unwrap().len());
+    }
+    // Watch opens without error and is cancelled again.
+    k8s::k8s_watch(h.clone(), h.state(), h.state(), id.clone(), None).await.expect("watch");
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    k8s::k8s_unwatch(h.state());
+}
+
+/// Write flow against a THROWAWAY cluster: scale, rollout restart, delete pod, logs, exec, port-forward, watch.
+/// Refuses to run unless the context name contains `dockspan-smoke`, e.g.
+/// `kind create cluster --name dockspan-smoke --kubeconfig /tmp/ds.kubeconfig` then
+/// `DOCKSPAN_K8S_KUBECONFIG=/tmp/ds.kubeconfig DOCKSPAN_K8S_CONTEXT=kind-dockspan-smoke cargo test k8s_write_flow -- --ignored --nocapture`.
+/// Everything lives in namespace `dockspan-smoke`, deleted at the end (alpine has no busybox httpd, so the pod uses `busybox:1.36`).
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn k8s_write_flow() {
+    use crate::k8s;
+    use k8s_openapi::api::apps::v1::Deployment;
+    use k8s_openapi::api::core::v1::{Namespace, Service};
+    use kube::api::{Api, DeleteParams, PostParams};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let path = std::env::var("DOCKSPAN_K8S_KUBECONFIG").expect("set DOCKSPAN_K8S_KUBECONFIG");
+    let ctx = std::env::var("DOCKSPAN_K8S_CONTEXT").expect("set DOCKSPAN_K8S_CONTEXT");
+    assert!(ctx.contains(PREFIX), "refusing to write to a cluster whose context is not named *{}*", PREFIX);
+    let ns = PREFIX.to_string();
+    let app = mk_k8s_app();
+    let h = app.handle().clone();
+    let st: tauri::State<'_, AppState> = h.state();
+    let ks: tauri::State<'_, k8s::K8sState> = h.state();
+
+    let c = k8s::k8s_add(h.state(), path.clone(), ctx.clone()).expect("add");
+    let id = c.id.clone();
+    println!("test: {}", k8s::k8s_test(h.state(), h.state(), id.clone(), None).await.expect("test"));
+
+    // Fixtures through kube directly: a namespace, a 1-replica busybox httpd deployment and a service on a named port.
+    let kc = kube::config::Kubeconfig::read_from(&path).unwrap();
+    let cfg = kube::Config::from_custom_kubeconfig(kc, &kube::config::KubeConfigOptions { context: Some(ctx.clone()), ..Default::default() }).await.unwrap();
+    let client = kube::Client::try_from(cfg).unwrap();
+    let pp = PostParams::default();
+    let _ = Api::<Namespace>::all(client.clone()).create(&pp, &serde_json::from_value(serde_json::json!({ "metadata": { "name": ns } })).unwrap()).await;
+    let dep: Deployment = serde_json::from_value(serde_json::json!({
+        "metadata": { "name": "web" },
+        "spec": { "replicas": 1, "selector": { "matchLabels": { "app": "web" } }, "template": {
+            "metadata": { "labels": { "app": "web" } },
+            "spec": { "terminationGracePeriodSeconds": 1, "containers": [{ "name": "web", "image": "busybox:1.36",
+                "command": ["sh", "-c", "mkdir -p /w && echo dockspan-ok > /w/index.html && echo started && httpd -f -p 8080 -h /w"],
+                "ports": [{ "name": "http", "containerPort": 8080 }],
+                "readinessProbe": { "tcpSocket": { "port": 8080 }, "periodSeconds": 1 } }] } } }
+    })).unwrap();
+    Api::<Deployment>::namespaced(client.clone(), &ns).create(&pp, &dep).await.expect("create deployment");
+    let svc: Service = serde_json::from_value(serde_json::json!({
+        "metadata": { "name": "web" }, "spec": { "selector": { "app": "web" }, "ports": [{ "port": 80, "targetPort": "http" }] }
+    })).unwrap();
+    Api::<Service>::namespaced(client.clone(), &ns).create(&pp, &svc).await.expect("create service");
+
+    let list = |kind: &'static str| {
+        let h = h.clone();
+        let id = id.clone();
+        let ns = ns.clone();
+        async move { k8s::k8s_list(h.state(), h.state(), id, kind.into(), Some(ns)).await.unwrap() }
+    };
+    async fn until<F: std::future::Future<Output = bool>>(secs: u64, mut f: impl FnMut() -> F) -> bool {
+        for _ in 0..secs * 2 {
+            if f().await {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        false
+    }
+    assert!(until(120, || async { list("deployments").await.first().is_some_and(|d| d["ready"] == 1) }).await, "deployment never became ready");
+
+    let watched = collect(&app, "k8s://watch");
+    k8s::k8s_watch(h.clone(), h.state(), h.state(), id.clone(), Some(ns.clone())).await.expect("watch");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    k8s::k8s_scale(h.state(), h.state(), id.clone(), ns.clone(), "web".into(), 2).await.expect("scale");
+    assert!(until(90, || async { list("deployments").await[0]["ready"] == 2 }).await, "scale to 2 never became ready");
+    assert!(wait_for(&watched, "\"deployments\"", 5).await, "no watch event for deployments");
+    println!("scaled to 2, watch events: {}", watched.lock().unwrap().len());
+
+    k8s::k8s_restart(h.state(), h.state(), id.clone(), ns.clone(), "web".into()).await.expect("restart");
+    let d = Api::<Deployment>::namespaced(client.clone(), &ns).get("web").await.unwrap();
+    assert!(d.spec.unwrap().template.metadata.unwrap().annotations.unwrap().contains_key("kubectl.kubernetes.io/restartedAt"));
+    assert!(until(120, || async {
+        let d = list("deployments").await;
+        let p = list("pods").await;
+        d[0]["updated"] == 2 && d[0]["ready"] == 2 && p.iter().filter(|x| x["status"] == "Running").count() == 2 && p.len() == 2
+    })
+    .await, "rollout restart did not finish");
+
+    let victim = list("pods").await[0]["name"].as_str().unwrap().to_string();
+    k8s::k8s_delete_pod(h.state(), h.state(), id.clone(), ns.clone(), victim.clone()).await.expect("delete pod");
+    assert!(until(90, || async { let p = list("pods").await; !p.iter().any(|x| x["name"] == victim.as_str()) && p.iter().filter(|x| x["ready"] == "1/1").count() == 2 }).await, "replacement pod missing");
+    let pod = list("pods").await.iter().find(|x| x["ready"] == "1/1").unwrap()["name"].as_str().unwrap().to_string();
+
+    // logs (no follow) end with {end: true}
+    let logs = collect(&app, "k8s://logs/wf");
+    k8s::k8s_logs(h.clone(), h.state(), h.state(), "wf".into(), id.clone(), ns.clone(), pod.clone(), None, false, false, Some(50)).await.expect("logs");
+    assert!(wait_for(&logs, "started", 10).await, "log line missing");
+    assert!(wait_for(&logs, "\"end\"", 10).await);
+
+    // exec: auto shell, run a command, read the output back
+    let out = collect(&app, "exec://wf");
+    k8s::k8s_exec(h.clone(), h.state(), h.state(), "wf".into(), id.clone(), ns.clone(), pod.clone(), None, "auto".into(), 100, 30).await.expect("exec");
+    k8s::k8s_exec_resize(h.state(), "wf".into(), 120, 40).await.expect("resize");
+    k8s::k8s_exec_write(h.state(), "wf".into(), "echo dockspan-$((40+2))\n".into()).await.expect("write");
+    let decoded = || {
+        let b64 = base64::engine::general_purpose::STANDARD;
+        out.lock().unwrap().iter().filter_map(|p| serde_json::from_str::<serde_json::Value>(p).ok()).filter_map(|v| v["d"].as_str().and_then(|d| b64.decode(d).ok())).map(|b| String::from_utf8_lossy(&b).to_string()).collect::<String>()
+    };
+    let mut ok = false;
+    for _ in 0..50 {
+        if decoded().contains("dockspan-42") {
+            ok = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert!(ok, "exec output missing: {:?}", decoded());
+    k8s::k8s_exec_write(h.state(), "wf".into(), "exit\n".into()).await.expect("exit");
+    assert!(wait_for(&out, "close", 10).await, "exec did not close after exit");
+    k8s::k8s_exec_close(h.state(), "wf".into()).await.unwrap();
+
+    // port-forward svc/web:80 → named target port http (8080); privileged port gets +8000
+    let pf = k8s::k8s_pf_start(h.state(), h.state(), id.clone(), ns.clone(), "web".into(), 80, None).await.expect("pf start");
+    println!("forward: {:?}", pf);
+    assert!(pf.local_port >= 8080);
+    for round in 0..2 {
+        let mut sock = tokio::net::TcpStream::connect(("127.0.0.1", pf.local_port)).await.expect("connect local");
+        sock.write_all(b"GET / HTTP/1.0\r\nHost: x\r\n\r\n").await.unwrap();
+        let mut body = String::new();
+        let _ = tokio::time::timeout(Duration::from_secs(10), sock.read_to_string(&mut body)).await;
+        assert!(body.contains("dockspan-ok"), "round {}: bad response {:?}", round, body);
+    }
+    assert_eq!(k8s::k8s_pf_list(h.state()).len(), 1);
+
+    // remove the cluster: its port-forwards stop and the port is free again
+    k8s::k8s_unwatch(h.state());
+    k8s::k8s_remove(h.state(), h.state(), id.clone()).await.expect("remove");
+    assert!(k8s::k8s_pf_list(h.state()).is_empty());
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(tokio::net::TcpListener::bind(("127.0.0.1", pf.local_port)).await.is_ok(), "local port still bound after remove");
+    let _ = (st, ks);
+
+    Api::<Namespace>::all(client).delete(&ns, &DeleteParams::default()).await.expect("delete namespace");
+    println!("k8s write flow OK");
+}

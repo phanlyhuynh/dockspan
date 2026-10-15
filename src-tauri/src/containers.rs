@@ -279,7 +279,7 @@ pub fn stats_unsubscribe(state: State<'_, AppState>, id: String) {
 
 // ---------- logs ----------
 
-fn split_ts(line: &str) -> (String, String) {
+pub(crate) fn split_ts(line: &str) -> (String, String) {
     if let Some((first, rest)) = line.split_once(' ') {
         if first.len() >= 20 && first.as_bytes()[4] == b'-' && first.contains('T') {
             return (first.to_string(), rest.to_string());

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Schedule } from '../api';
 import { useApp, usePruneDefs } from '../store';
+import { useK8s } from '../k8sStore';
 import { fmtBytes } from '../lib/format';
 import { selectedTotal, sumBytes } from '../lib/prune';
 import { imgRef, shortPath, stateLabel } from '../lib/ui';
@@ -79,11 +80,13 @@ export function PaletteModal() {
       act(t("Open Kubernetes"), 'pods, deployments, services', () => s.setView('kubernetes')),
       act(t("Manage connections"), 'Docker context & cluster', () => s.setView('settings')),
     ];
+    const k8s = useK8s.getState();
+    const cls: PalItem[] = k8s.clusters.map((c) => ({ kind: 'Cluster', label: t("Open cluster {name}", { name: c.name }), sub: c.server, run: () => { close(); s.setView('kubernetes'); void k8s.select(c.id); } }));
     const ctxs: PalItem[] = s.contexts.filter((c) => !c.active && c.supported).map((c) => ({ kind: 'Context', label: t("Switch to {name}", { name: c.name }), sub: c.endpoint, run: () => { close(); void s.switchCtx(c.id); } }));
     const cts: PalItem[] = s.containers.map((c) => ({ kind: 'Container', label: c.name, sub: `${c.image} · ${stateLabel(c.state)}`, run: () => { close(); useApp.setState({ view: 'containers', selected: c.id, cq: '', onlyRunning: false }); } }));
     const prs: PalItem[] = s.projects.map((p) => ({ kind: t("Projects"), label: p.name, sub: shortPath(p.path), run: () => { close(); s.openModal({ kind: 'files', projectId: p.id }); } }));
     const ims: PalItem[] = s.images.filter((im) => !im.dangling).map((im) => ({ kind: 'Image', label: imgRef(im), sub: fmtBytes(im.size), run: () => { close(); useApp.setState({ view: 'images' }); s.openModal({ kind: 'image', ref: imgRef(im) }); } }));
-    const all = [...actions, ...ctxs, ...cts, ...prs, ...ims];
+    const all = [...actions, ...ctxs, ...cls, ...cts, ...prs, ...ims];
     const query = q.trim();
     if (!query) return [...actions, ...cts.slice(0, 4)].slice(0, 10);
     return all
