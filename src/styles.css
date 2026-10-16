@@ -144,3 +144,5 @@ textarea.inp{height:auto;min-height:76px;padding:10px 12px;font-family:'JetBrain
 .blur { opacity: .55; filter: grayscale(.4); transition: opacity .2s; }
 .filedrop { outline: 2px dashed #4C8DFF; outline-offset: -6px; }
 textarea.editor { width: 100%; min-height: 260px; max-height: 360px; background: #0B0D11; color: #D5DAE3; border: 0; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; resize: vertical; outline: none; white-space: pre; }
+/* Keep the main navigation fixed while the page content scrolls (only when it sits beside the content, not wrapped above it). */
+@media (min-width: 800px) { .side { position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto; } }
