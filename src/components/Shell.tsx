@@ -46,7 +46,7 @@ export function Sidebar() {
 
   const ctx = engine.ctx;
   return (
-    <nav aria-label={t("Main navigation")} style={{ flex: '1 1 236px', maxWidth: '100%', minWidth: 0, background: '#14171D', borderRight: '1px solid #242935', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <nav className="side" aria-label={t("Main navigation")} style={{ flex: '1 1 236px', maxWidth: '100%', minWidth: 0, background: '#14171D', borderRight: '1px solid #242935', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px' }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: '#2F6FEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon d={ICONS.logo} size={20} stroke="#FFFFFF" />
