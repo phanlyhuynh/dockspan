@@ -29,11 +29,19 @@
 
 ## Features
 
+### Projects
+
+<img src="docs/screenshots/projects.png" alt="Projects page" width="800">
+
+- Remember any folder; `docker-compose.yml` and `Dockerfile` are detected automatically.
+- One-click `compose up/stop/restart/down` for a whole project, or build an image from a Dockerfile-only folder.
+- Browse and edit the project's files; `.env` hides sensitive values.
+- Rename a project, open a terminal in its folder, or jump to its containers.
+
 ### Docker
 
 <img src="docs/screenshots/containers-logs.png" alt="Containers table with live logs" width="800">
 
-- **Projects:** add or detect Compose projects, `compose up/stop/restart/down`, browse and edit files; `.env` hides sensitive values.
 - **Containers:** create, start, stop, restart, delete; realtime logs filtered by level, xterm.js terminals, stats, inspect.
 - **Images:** pull with progress, build, layer history, delete.
 - **Networks & Volumes:** browse, with volume backup and restore.

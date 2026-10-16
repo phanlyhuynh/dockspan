@@ -29,11 +29,19 @@
 
 ## Tính năng
 
+### Dự án
+
+<img src="docs/screenshots/projects.png" alt="Trang Dự án" width="800">
+
+- Ghi nhớ bất kỳ thư mục nào; `docker-compose.yml` và `Dockerfile` được tự nhận diện.
+- `compose up/stop/restart/down` một cú nhấp cho cả dự án, hoặc build image từ thư mục chỉ có Dockerfile.
+- Duyệt và sửa file của dự án; `.env` che các giá trị nhạy cảm.
+- Đổi tên dự án, mở terminal ngay tại thư mục, hoặc nhảy tới các container của dự án.
+
 ### Docker
 
 <img src="docs/screenshots/containers-logs.png" alt="Bảng container và log trực tiếp" width="800">
 
-- **Dự án:** thêm hoặc tự nhận diện dự án Compose, `compose up/stop/restart/down`, duyệt và sửa file; `.env` che các giá trị nhạy cảm.
 - **Container:** tạo, chạy, dừng, khởi động lại, xóa; log realtime lọc theo mức, terminal xterm.js, thống kê, inspect.
 - **Image:** pull có tiến trình, build, xem lịch sử layer, xóa.
 - **Network & Volume:** duyệt, kèm sao lưu và khôi phục volume.
