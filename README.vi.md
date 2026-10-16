@@ -59,11 +59,24 @@ Xem [docs/kubernetes.md](docs/kubernetes.md): namespace và cách xử lý lỗi
 
 - Thêm engine Docker qua SSH (lấy host từ `~/.ssh/config`), TCP+TLS hoặc WSL2 và chuyển đổi chỉ với một cú nhấp.
 - Các distro WSL2 được liệt kê cùng phiên bản Docker, có nút cài Docker Engine.
-- **Trang SSH** riêng với số tab terminal tùy ý cho mỗi host (nhập mật khẩu, vim/htop, đổi cỡ cửa sổ đều hoạt động).
 
 <details><summary>Chi tiết hơn</summary>
 
 Xem [docs/connections.md](docs/connections.md): docker context, cầu nối SSH/WSL2, file TLS, trang SSH.
+
+</details>
+
+### Terminal SSH
+
+<img src="docs/screenshots/ssh.png" alt="Trang SSH với nhiều tab terminal" width="800">
+
+- **Trang SSH** riêng, độc lập với Docker: host từ `~/.ssh/config`, các docker context SSH và host bạn thêm trong ứng dụng.
+- Số tab terminal tùy ý cho mỗi host, chạy `ssh` của hệ thống trong pseudo-terminal thật nên nhập mật khẩu, câu hỏi host-key, vim/htop và đổi cỡ cửa sổ đều hoạt động.
+- Terminal giữ nguyên khi chuyển trang, có thể tách sang cửa sổ riêng, và phiên đã kết thúc có nút **Reconnect**.
+
+<details><summary>Chi tiết hơn</summary>
+
+Xem [docs/connections.md](docs/connections.md#ssh-page).
 
 </details>
 
@@ -108,7 +121,7 @@ pnpm tauri build    # đóng gói
 - ✅ Tổng quan, Dự án (Compose), Container, Image, Network, Volume
 - ✅ Dọn dẹp có xem trước và lịch tự động
 - ✅ Kubernetes: Deployment, Pod, Service, port-forward
-- ✅ Terminal SSH, bảng lệnh ⌘K, tiếng Anh/tiếng Việt
+- ✅ Trang SSH với terminal, bảng lệnh ⌘K, tiếng Anh/tiếng Việt
 - ⬜ Context có `SkipTLSVerify`
 - ⬜ StatefulSet / DaemonSet / Job và sửa YAML trong Kubernetes
 - ⬜ Khôi phục port-forward khi khởi động lại

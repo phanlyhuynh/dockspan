@@ -59,11 +59,24 @@ See [docs/kubernetes.md](docs/kubernetes.md): namespaces and 403 fallback, exec 
 
 - Add Docker engines over SSH (hosts from `~/.ssh/config`), TCP+TLS or WSL2, and switch between them in one click.
 - WSL2 distros are listed with their Docker version, with one-click Docker Engine install.
-- A separate **SSH page** with any number of real terminal tabs per host (password prompts, vim/htop and resizing work).
 
 <details><summary>More details</summary>
 
 See [docs/connections.md](docs/connections.md): docker contexts, the SSH/WSL2 bridge, TLS files, the SSH page.
+
+</details>
+
+### SSH terminals
+
+<img src="docs/screenshots/ssh.png" alt="SSH page with several terminal tabs" width="800">
+
+- A dedicated **SSH page**, independent of Docker: hosts from `~/.ssh/config`, SSH Docker contexts and hosts you add in the app.
+- Any number of terminal tabs per host, running the system `ssh` in a real pseudo-terminal, so password prompts, host-key questions, vim/htop and resizing work.
+- Terminals survive changing page, can be moved to a separate window, and an ended session offers **Reconnect**.
+
+<details><summary>More details</summary>
+
+See [docs/connections.md](docs/connections.md#ssh-page).
 
 </details>
 
@@ -108,7 +121,7 @@ pnpm tauri build    # package it
 - ✅ Overview, Projects (Compose), Containers, Images, Networks, Volumes
 - ✅ Cleanup with preview and automatic schedule
 - ✅ Kubernetes: Deployments, Pods, Services, port-forward
-- ✅ SSH terminals, ⌘K palette, English/Vietnamese
+- ✅ SSH page with terminals, ⌘K palette, English/Vietnamese
 - ⬜ Contexts with `SkipTLSVerify`
 - ⬜ StatefulSets / DaemonSets / Jobs and YAML editing in Kubernetes
 - ⬜ Restore port-forwards on restart
