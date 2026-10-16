@@ -113,7 +113,7 @@ Tải bản mới nhất từ [GitHub Releases](https://github.com/phanlyhuynh/d
 ```bash
 pnpm install
 pnpm tauri dev      # chạy ứng dụng
-pnpm tauri build    # đóng gói
+pnpm package        # tạo bộ cài cho hệ điều hành hiện tại (.dmg / .msi+.exe / .deb+.AppImage)
 ```
 
 ## Bắt đầu nhanh

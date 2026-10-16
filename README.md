@@ -113,7 +113,7 @@ Download the latest build from [GitHub Releases](https://github.com/phanlyhuynh/
 ```bash
 pnpm install
 pnpm tauri dev      # run the app
-pnpm tauri build    # package it
+pnpm package        # build installers for your OS (.dmg / .msi+.exe / .deb+.AppImage)
 ```
 
 ## Quick start

@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "package": "node scripts/build.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.2.0",
