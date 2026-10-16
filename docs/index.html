@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dockspan — Docker &amp; Kubernetes desktop manager</title>
+<meta name="description" content="A fast, lightweight desktop manager for Docker and Kubernetes, built around your project folders.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dockspan — Docker &amp; Kubernetes desktop manager">
+<meta property="og:description" content="A fast, lightweight desktop manager for Docker and Kubernetes, built around your project folders.">
+<meta property="og:image" content="screenshots/overview.png">
+<link rel="icon" href="assets/logo.png">
+<style>
+:root{--bg:#0E1014;--panel:#161A21;--line:#242935;--text:#E6E8EE;--muted:#8F98A8;--accent:#2F6FEB;--accent-hi:#3D7CF5;--link:#7FB0FF}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.6}
+a{color:var(--link)}img{max-width:100%;height:auto;display:block}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.top{position:sticky;top:0;z-index:5;background:rgba(14,16,20,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:20px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--text);text-decoration:none;margin-right:auto}
+.brand img{width:28px;height:28px;border-radius:7px}
+header.top nav{display:flex;gap:20px}
+header.top nav a{color:var(--muted);text-decoration:none;font-size:14px}header.top nav a:hover{color:var(--text)}
+.lang{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;color:var(--text);text-decoration:none}
+.hero{text-align:center;padding:72px 0 40px}
+h1{font-size:clamp(34px,6vw,58px);line-height:1.1;letter-spacing:-.02em;margin:0 0 18px}
+.hero p.sub{max-width:660px;margin:0 auto 28px;color:#B8C0CE;font-size:18px}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;height:46px;padding:0 22px;border-radius:10px;border:1px solid #2A303C;background:#1A1E26;color:var(--text);text-decoration:none;font-weight:500}
+.btn:hover{background:#232935}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.btn.pri:hover{background:var(--accent-hi)}
+.note{color:var(--muted);font-size:13px;margin-top:14px}
+.shot{border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.hero .shot{margin-top:44px}
+section{padding:64px 0}
+h2{font-size:clamp(26px,4vw,34px);letter-spacing:-.01em;margin:0 0 28px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.card h3{margin:0 0 6px;font-size:17px}.card p{margin:0;color:#B8C0CE;font-size:15px}
+.feat{display:grid;grid-template-columns:1fr 1.25fr;gap:40px;align-items:center;padding:36px 0}
+.feat:nth-child(even) .txt{order:2}
+.feat h3{font-size:26px;margin:0 0 8px}.feat .lead{color:#B8C0CE;margin:0 0 14px}
+.feat ul{margin:0;padding-left:20px;color:#B8C0CE}.feat li{margin:6px 0}
+.tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.tags span{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 16px;font-size:14px;color:#C9D0DC}
+pre{background:#0B0D11;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font:13.5px/1.7 'JetBrains Mono',ui-monospace,monospace;color:#D5DAE3;max-width:560px;margin:20px auto 0}
+.center{text-align:center}.center p{color:#B8C0CE;margin:0 0 20px}
+footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;gap:20px;flex-wrap:wrap;justify-content:space-between}
+@media(max-width:760px){header.top nav{display:none}.feat{grid-template-columns:1fr;gap:20px}.feat:nth-child(even) .txt{order:0}.hero{padding-top:48px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="#"><img src="assets/logo.png" alt="">Dockspan</a>
+<nav><a href="#features">Features</a><a href="#why">Why</a><a href="#download">Download</a><a href="https://github.com/phanlyhuynh/dockspan">GitHub</a></nav>
+<a class="lang" href="vi.html" hreflang="vi">Tiếng Việt</a>
+</div></header>
+<main>
+<div class="wrap hero">
+<h1>Docker & Kubernetes,<br>organized by project.</h1>
+<p class="sub">Dockspan is a fast desktop manager that puts your project folder at the center. Compose, containers, images, volumes and Kubernetes clusters in one lightweight app.</p>
+<div class="btns"><a class="btn pri" href="#download">Download</a><a class="btn" href="https://github.com/phanlyhuynh/dockspan">View on GitHub</a></div>
+<div class="shot"><img src="screenshots/overview.png" alt="Dockspan" width="1440" height="960"></div>
+</div>
+<section id="why"><div class="wrap"><h2>Why Dockspan?</h2><div class="grid">
+<div class="card"><h3>Project-first</h3><p>Add a folder with a Compose file or Dockerfile and manage it as one unit: up, stop, restart, down, edit files.</p></div>
+<div class="card"><h3>Docker + Kubernetes</h3><p>Containers, images, volumes and your kubeconfig clusters side by side.</p></div>
+<div class="card"><h3>Shares your docker contexts</h3><p>Connections are real docker contexts, so the docker CLI sees them too.</p></div>
+<div class="card"><h3>Any engine</h3><p>Local socket, SSH, TCP+TLS and WSL2.</p></div>
+<div class="card"><h3>Lightweight</h3><p>Tauri + Rust instead of a bundled browser; no heavy background services.</p></div>
+<div class="card"><h3>Secrets stay in Rust</h3><p>The webview never touches the socket or your kubeconfig; .env values are masked.</p></div>
+</div></div></section>
+<section id="features"><div class="wrap"><h2>Features</h2>
+<div class="feat"><div class="txt"><h3>Projects</h3><p class="lead">Manage a whole Compose project at once.</p><ul><li>Folders are detected automatically (docker-compose.yml, Dockerfile).</li><li>One-click compose up / stop / restart / down.</li><li>Browse and edit files; .env hides sensitive values.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/projects.png" alt="Projects" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Containers</h3><p class="lead">Logs, terminal, stats and inspect for each container.</p><ul><li>Realtime logs filtered by level and keyword.</li><li>Built-in xterm.js terminals that survive page changes.</li><li>Create, start, stop, restart, delete; CPU and RAM at a glance.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/containers-logs.png" alt="Containers" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Kubernetes</h3><p class="lead">Your kubeconfig clusters, independent of the Docker engine.</p><ul><li>Deployments: scale and rollout restart.</li><li>Pods: logs, exec terminal, plain-language failure explanations.</li><li>Services and port-forward; lists update through watches.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/kubernetes.png" alt="Kubernetes" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Connections</h3><p class="lead">Switch between engines in one click.</p><ul><li>Local, SSH, TCP+TLS and WSL2 engines, stored as real docker contexts.</li><li>Hosts picked from ~/.ssh/config, with ProxyJump and keys applied.</li><li>WSL2 distros listed, with one-click Docker Engine install.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/connections.png" alt="Connections" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>SSH terminals</h3><p class="lead">A dedicated SSH page with real terminals.</p><ul><li>Any number of tabs per host, running the system ssh in a pseudo-terminal.</li><li>Password prompts, vim/htop and resizing work.</li><li>Detach to a separate window; reconnect ended sessions.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/ssh.png" alt="SSH terminals" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Cleanup</h3><p class="lead">See what will be removed before anything is deleted.</p><ul><li>Preview unused images, networks, volumes and build cache.</li><li>Clean on demand or on an automatic schedule.</li><li>&quot;In use&quot; means any container, even a stopped one, references it.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/cleanup.png" alt="Cleanup" width="1440" height="960"></div></div>
+<h2 style="margin-top:56px">And more</h2><div class="tags"><span>⌘K / Ctrl+K command palette</span><span>English and Vietnamese UI</span><span>Start and stop the engine from the app</span><span>Banner when the connection is lost</span><span>Image pull with progress, build, layer history</span><span>Volume browse, backup and restore</span></div></div></section>
+<section id="download"><div class="wrap center"><h2>Get Dockspan</h2><p>Download the latest build from GitHub Releases, or build from source.</p>
+<div class="btns"><a class="btn pri" href="https://github.com/phanlyhuynh/dockspan/releases">GitHub Releases</a></div>
+<p class="note">Release builds coming soon (macOS, Windows, Linux).</p>
+<h3 style="margin-top:40px">Build from source</h3>
+<pre>pnpm install
+pnpm package</pre></div></section>
+</main>
+<footer><div class="wrap"><span>© 2026 phanlyhuynh · MIT License</span><span><a href="https://github.com/phanlyhuynh/dockspan">GitHub</a> · <a href="https://github.com/phanlyhuynh/dockspan/blob/main/docs/connections.md">Docs</a> · <a href="https://github.com/phanlyhuynh/dockspan/blob/main/CONTRIBUTING.md">Contributing</a></span></div></footer>
+</body></html>

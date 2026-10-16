@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dockspan — Quản lý Docker &amp; Kubernetes trên desktop</title>
+<meta name="description" content="Ứng dụng desktop nhanh, nhẹ để quản lý Docker và Kubernetes, lấy thư mục dự án làm trung tâm.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dockspan — Quản lý Docker &amp; Kubernetes trên desktop">
+<meta property="og:description" content="Ứng dụng desktop nhanh, nhẹ để quản lý Docker và Kubernetes, lấy thư mục dự án làm trung tâm.">
+<meta property="og:image" content="screenshots/overview.png">
+<link rel="icon" href="assets/logo.png">
+<style>
+:root{--bg:#0E1014;--panel:#161A21;--line:#242935;--text:#E6E8EE;--muted:#8F98A8;--accent:#2F6FEB;--accent-hi:#3D7CF5;--link:#7FB0FF}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.6}
+a{color:var(--link)}img{max-width:100%;height:auto;display:block}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.top{position:sticky;top:0;z-index:5;background:rgba(14,16,20,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:20px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--text);text-decoration:none;margin-right:auto}
+.brand img{width:28px;height:28px;border-radius:7px}
+header.top nav{display:flex;gap:20px}
+header.top nav a{color:var(--muted);text-decoration:none;font-size:14px}header.top nav a:hover{color:var(--text)}
+.lang{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;color:var(--text);text-decoration:none}
+.hero{text-align:center;padding:72px 0 40px}
+h1{font-size:clamp(34px,6vw,58px);line-height:1.1;letter-spacing:-.02em;margin:0 0 18px}
+.hero p.sub{max-width:660px;margin:0 auto 28px;color:#B8C0CE;font-size:18px}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;height:46px;padding:0 22px;border-radius:10px;border:1px solid #2A303C;background:#1A1E26;color:var(--text);text-decoration:none;font-weight:500}
+.btn:hover{background:#232935}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.btn.pri:hover{background:var(--accent-hi)}
+.note{color:var(--muted);font-size:13px;margin-top:14px}
+.shot{border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.hero .shot{margin-top:44px}
+section{padding:64px 0}
+h2{font-size:clamp(26px,4vw,34px);letter-spacing:-.01em;margin:0 0 28px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.card h3{margin:0 0 6px;font-size:17px}.card p{margin:0;color:#B8C0CE;font-size:15px}
+.feat{display:grid;grid-template-columns:1fr 1.25fr;gap:40px;align-items:center;padding:36px 0}
+.feat:nth-child(even) .txt{order:2}
+.feat h3{font-size:26px;margin:0 0 8px}.feat .lead{color:#B8C0CE;margin:0 0 14px}
+.feat ul{margin:0;padding-left:20px;color:#B8C0CE}.feat li{margin:6px 0}
+.tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.tags span{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 16px;font-size:14px;color:#C9D0DC}
+pre{background:#0B0D11;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font:13.5px/1.7 'JetBrains Mono',ui-monospace,monospace;color:#D5DAE3;max-width:560px;margin:20px auto 0}
+.center{text-align:center}.center p{color:#B8C0CE;margin:0 0 20px}
+footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;gap:20px;flex-wrap:wrap;justify-content:space-between}
+@media(max-width:760px){header.top nav{display:none}.feat{grid-template-columns:1fr;gap:20px}.feat:nth-child(even) .txt{order:0}.hero{padding-top:48px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="#"><img src="assets/logo.png" alt="">Dockspan</a>
+<nav><a href="#features">Tính năng</a><a href="#why">Vì sao chọn</a><a href="#download">Tải về</a><a href="https://github.com/phanlyhuynh/dockspan">GitHub</a></nav>
+<a class="lang" href="index.html" hreflang="en">English</a>
+</div></header>
+<main>
+<div class="wrap hero">
+<h1>Docker & Kubernetes,<br>sắp xếp theo dự án.</h1>
+<p class="sub">Dockspan là ứng dụng desktop nhanh, lấy thư mục dự án làm trung tâm. Compose, container, image, volume và cluster Kubernetes trong một ứng dụng nhẹ.</p>
+<div class="btns"><a class="btn pri" href="#download">Tải về</a><a class="btn" href="https://github.com/phanlyhuynh/dockspan">Xem trên GitHub</a></div>
+<div class="shot"><img src="screenshots/overview.png" alt="Dockspan" width="1440" height="960"></div>
+</div>
+<section id="why"><div class="wrap"><h2>Vì sao chọn Dockspan?</h2><div class="grid">
+<div class="card"><h3>Lấy dự án làm trung tâm</h3><p>Thêm một thư mục có file Compose hoặc Dockerfile rồi quản lý như một khối: up, stop, restart, down, sửa file.</p></div>
+<div class="card"><h3>Docker + Kubernetes</h3><p>Container, image, volume và các cluster trong kubeconfig nằm cạnh nhau.</p></div>
+<div class="card"><h3>Dùng chung docker context</h3><p>Mỗi kết nối là một docker context thật, nên lệnh docker cũng thấy được.</p></div>
+<div class="card"><h3>Mọi loại engine</h3><p>Socket cục bộ, SSH, TCP+TLS và WSL2.</p></div>
+<div class="card"><h3>Nhẹ</h3><p>Tauri + Rust, không đóng gói cả trình duyệt và không chạy dịch vụ nền nặng.</p></div>
+<div class="card"><h3>Bí mật nằm trong Rust</h3><p>Webview không chạm vào socket hay kubeconfig; giá trị trong .env được che.</p></div>
+</div></div></section>
+<section id="features"><div class="wrap"><h2>Tính năng</h2>
+<div class="feat"><div class="txt"><h3>Dự án</h3><p class="lead">Quản lý cả dự án Compose cùng lúc.</p><ul><li>Tự nhận diện thư mục (docker-compose.yml, Dockerfile).</li><li>compose up / stop / restart / down chỉ một cú nhấp.</li><li>Duyệt và sửa file; .env che các giá trị nhạy cảm.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/projects.png" alt="Dự án" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Container</h3><p class="lead">Log, terminal, thống kê và inspect cho từng container.</p><ul><li>Log realtime, lọc theo mức và từ khóa.</li><li>Terminal xterm.js tích hợp, giữ nguyên khi chuyển trang.</li><li>Tạo, chạy, dừng, khởi động lại, xóa; xem CPU và RAM ngay trên bảng.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/containers-logs.png" alt="Container" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Kubernetes</h3><p class="lead">Cluster trong kubeconfig, độc lập với engine Docker.</p><ul><li>Deployment: scale và rollout restart.</li><li>Pod: log, terminal exec, giải thích lỗi thường gặp.</li><li>Service và port-forward; danh sách cập nhật bằng watch.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/kubernetes.png" alt="Kubernetes" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Kết nối</h3><p class="lead">Chuyển đổi giữa các engine chỉ với một cú nhấp.</p><ul><li>Engine local, SSH, TCP+TLS và WSL2, lưu thành docker context thật.</li><li>Chọn host từ ~/.ssh/config, áp dụng cả ProxyJump và khóa.</li><li>Liệt kê distro WSL2, cài Docker Engine một cú nhấp.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/connections.png" alt="Kết nối" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Terminal SSH</h3><p class="lead">Trang SSH riêng với terminal thật.</p><ul><li>Số tab tùy ý cho mỗi host, chạy ssh của hệ thống trong pseudo-terminal.</li><li>Nhập mật khẩu, vim/htop và đổi cỡ cửa sổ đều hoạt động.</li><li>Tách sang cửa sổ riêng; kết nối lại phiên đã kết thúc.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/ssh.png" alt="Terminal SSH" width="1440" height="960"></div></div>
+<div class="feat"><div class="txt"><h3>Dọn dẹp</h3><p class="lead">Xem trước thứ sẽ bị xóa trước khi xóa thật.</p><ul><li>Xem trước image, network, volume và build cache không dùng.</li><li>Dọn thủ công hoặc theo lịch tự động.</li><li>&quot;Đang dùng&quot; nghĩa là có container nào, kể cả đã dừng, tham chiếu tới.</li></ul></div><div class="shot"><img loading="lazy" src="screenshots/cleanup.png" alt="Dọn dẹp" width="1440" height="960"></div></div>
+<h2 style="margin-top:56px">Và hơn thế nữa</h2><div class="tags"><span>Bảng lệnh ⌘K / Ctrl+K</span><span>Giao diện tiếng Anh và tiếng Việt</span><span>Bật/tắt engine ngay trong ứng dụng</span><span>Banner khi mất kết nối</span><span>Pull image có tiến trình, build, lịch sử layer</span><span>Duyệt, sao lưu và khôi phục volume</span></div></div></section>
+<section id="download"><div class="wrap center"><h2>Tải Dockspan</h2><p>Tải bản mới nhất từ GitHub Releases, hoặc build từ mã nguồn.</p>
+<div class="btns"><a class="btn pri" href="https://github.com/phanlyhuynh/dockspan/releases">GitHub Releases</a></div>
+<p class="note">Bản phát hành sắp có (macOS, Windows, Linux).</p>
+<h3 style="margin-top:40px">Build từ mã nguồn</h3>
+<pre>pnpm install
+pnpm package</pre></div></section>
+</main>
+<footer><div class="wrap"><span>© 2026 phanlyhuynh · Giấy phép MIT</span><span><a href="https://github.com/phanlyhuynh/dockspan">GitHub</a> · <a href="https://github.com/phanlyhuynh/dockspan/blob/main/docs/connections.md">Tài liệu</a> · <a href="https://github.com/phanlyhuynh/dockspan/blob/main/CONTRIBUTING.md">Contributing</a></span></div></footer>
+</body></html>
