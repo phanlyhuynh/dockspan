@@ -1,7 +1,7 @@
 <div align="center">
 
-<!-- TODO: replace with a proper logo (this is the current app icon) -->
-<img src="src-tauri/icons/128x128.png" alt="Dockspan logo" width="96" height="96">
+<!-- TODO: replace with a proper logo (this is a simple SVG of the app icon) -->
+<img src="docs/assets/logo.svg" alt="Dockspan logo" width="96" height="96">
 
 # Dockspan
 

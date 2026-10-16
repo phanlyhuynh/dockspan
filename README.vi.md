@@ -1,7 +1,7 @@
 <div align="center">
 
-<!-- TODO: thay bằng logo chính thức (hiện là icon của ứng dụng) -->
-<img src="src-tauri/icons/128x128.png" alt="Logo Dockspan" width="96" height="96">
+<!-- TODO: thay bằng logo chính thức (hiện là bản SVG đơn giản của icon ứng dụng) -->
+<img src="docs/assets/logo.svg" alt="Logo Dockspan" width="96" height="96">
 
 # Dockspan
 
